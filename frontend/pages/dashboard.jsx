@@ -46,42 +46,63 @@ export default function Dashboard() {
       setUser(u)
       setInitializing(false)
       if (!u) return // wait for auth state change before redirecting
-
-      try {
-        // Migration: if old single-conversation key exists, migrate it
-        const oldRaw = localStorage.getItem(`conversation:${u.id}`)
-        const newRaw = localStorage.getItem(`conversations:${u.id}`)
-          if (!newRaw && oldRaw) {
-          const msgs = JSON.parse(oldRaw)
-          const conv = { id: `c-${Date.now()}`, title: 'Conversation 1', messages: msgs || [], createdAt: Date.now() }
-          localStorage.setItem(`conversations:${u.id}`, JSON.stringify([conv]))
-          localStorage.setItem(`conversations:selected:${u.id}`, conv.id)
-          setConversations([conv])
-          setSelectedId(conv.id)
-        } else if (newRaw) {
-          const arr = JSON.parse(newRaw)
-          setConversations(arr || [])
-          const sel = localStorage.getItem(`conversations:selected:${u.id}`) || (arr && arr[0]?.id) || null
-          setSelectedId(sel)
-        } else {
-          // no previous data: initialize an empty conversation list
-          const conv = { id: `c-${Date.now()}`, title: 'Conversation 1', messages: [], createdAt: Date.now() }
-          setConversations([conv])
-          setSelectedId(conv.id)
-        }
-      } catch (e) {
-        console.warn('Could not load conversations', e)
-      }
     }
     init()
+
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       const u = session?.user ?? null
       // if user signed out, go to home
       if (event === 'SIGNED_OUT') router.push('/')
       setUser(u)
     })
-    return () => { sub?.subscription?.unsubscribe?.(); mounted = false }
+
+    return () => {
+      mounted = false
+      sub?.subscription?.unsubscribe()
+    }
   }, [router])
+
+  // Load conversations when user changes
+  useEffect(() => {
+    if (!user) return
+    try {
+      // Migration: if old single-conversation key exists, migrate it
+      const oldRaw = localStorage.getItem(`conversation:${user.id}`)
+      let migrated = false
+      if (oldRaw) {
+        try {
+          const oldMessages = JSON.parse(oldRaw)
+          if (Array.isArray(oldMessages) && oldMessages.length > 0) {
+            const newConv = { id: `c-${Date.now()}`, title: 'Migrated Conversation', messages: oldMessages, createdAt: Date.now() }
+            localStorage.setItem(`conversations:${user.id}`, JSON.stringify([newConv]))
+            localStorage.removeItem(`conversation:${user.id}`) // clear old
+            localStorage.setItem(`conversations:selected:${user.id}`, newConv.id)
+            migrated = true
+          }
+        } catch (e) { }
+      }
+
+      const raw = localStorage.getItem(`conversations:${user.id}`)
+      let arr = []
+      if (raw) {
+        try { arr = JSON.parse(raw) } catch (e) { }
+      }
+
+      if (Array.isArray(arr) && arr.length > 0) {
+        setConversations(arr)
+        // restore selection or pick first
+        const sel = localStorage.getItem(`conversations:selected:${user.id}`) || arr[0]?.id || null
+        setSelectedId(sel)
+      } else {
+        // no previous data: initialize an empty conversation list
+        const conv = { id: `c-${Date.now()}`, title: 'Conversation 1', messages: [], createdAt: Date.now() }
+        setConversations([conv])
+        setSelectedId(conv.id)
+      }
+    } catch (e) {
+      console.error('Error loading conversations', e)
+    }
+  }, [user])
 
   // persist conversations + selected id
   useEffect(() => {
@@ -89,7 +110,7 @@ export default function Dashboard() {
     try {
       localStorage.setItem(`conversations:${user.id}`, JSON.stringify(conversations))
       if (selectedId) localStorage.setItem(`conversations:selected:${user.id}`, selectedId)
-    } catch (e) {}
+    } catch (e) { }
   }, [conversations, selectedId, user])
 
   // auto-scroll messages container to bottom on new messages / selection change (smooth)
@@ -103,7 +124,7 @@ export default function Dashboard() {
       } else {
         el.scrollTop = el.scrollHeight
       }
-    } catch (e) {}
+    } catch (e) { }
   }, [conversations, selectedId])
 
   const handleTranscript = (text) => {
@@ -117,23 +138,25 @@ export default function Dashboard() {
     const userEntry = { role: 'user', text }
     const pendingAssistant = { role: 'assistant', text: 'Thinking...', _pending: true }
     // if a local placeholder exists as the last user message, replace it
-    setConversations((list) => list.map((c) => {
-      if (c.id !== selectedId) return c
-      const last = c.messages[c.messages.length - 1]
-      let msgs = c.messages
-      if (last && last.role === 'user' && last._local) {
-        msgs = [...c.messages.slice(0, -1), userEntry, pendingAssistant]
-      } else {
-        msgs = [...c.messages, userEntry, pendingAssistant]
-      }
-      return { ...c, messages: msgs }
-    }))
+    setConversations((list) => {
+      return list.map((c) => {
+        if (c.id !== selectedId) return c
+        const last = c.messages[c.messages.length - 1]
+        let msgs = c.messages
+        if (last && last.role === 'user' && last._local) {
+          msgs = [...c.messages.slice(0, -1), userEntry, pendingAssistant]
+        } else {
+          msgs = [...c.messages, userEntry, pendingAssistant]
+        }
+        return { ...c, messages: msgs }
+      })
+    })
 
     try {
       const conv = getSelectedConversation()
       const payload = { text }
       if (conv?.geminiSessionId) payload.session_id = conv.geminiSessionId
-      console.log('proxy /api/proxy-chat sending payload', payload)
+      // console.log('proxy /api/proxy-chat sending payload', payload)
       const controller = new AbortController()
       const timeoutMs = 25000
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
@@ -174,10 +197,10 @@ export default function Dashboard() {
       // replace the pending assistant message with final reply and save gemini session id if provided
       const sessionId = data?.session_id || data?.session || data?.gemini_session_id || data?.sessionId || null
       setConversations((list) => list.map((c) => {
-          if (c.id !== selectedId) return c
-          const msgs = c.messages.map((m) => m._pending ? ({ role: 'assistant', text: final }) : m)
-          return { ...c, messages: msgs, geminiSessionId: sessionId || c.geminiSessionId }
-        }))
+        if (c.id !== selectedId) return c
+        const msgs = c.messages.map((m) => m._pending ? ({ role: 'assistant', text: final }) : m)
+        return { ...c, messages: msgs, geminiSessionId: sessionId || c.geminiSessionId }
+      }))
 
       // Auto-play assistant reply TTS
       try { playAssistantAudio(final) } catch (e) { console.warn('Auto-play failed', e) }
@@ -206,7 +229,7 @@ export default function Dashboard() {
     setTtsLoadingText(text)
     try {
       // stop any existing playback
-      try { audioRef.current?.pause?.(); URL.revokeObjectURL(playingUrl) } catch (e) {}
+      try { audioRef.current?.pause?.(); URL.revokeObjectURL(playingUrl) } catch (e) { }
       setPlayingUrl(null)
       setPlayingText(null)
 
@@ -264,7 +287,7 @@ export default function Dashboard() {
           audioRef.current = a
           a.play().finally(() => {
             a.addEventListener('ended', () => {
-              try { URL.revokeObjectURL(url) } catch (e) {}
+              try { URL.revokeObjectURL(url) } catch (e) { }
               setPlayingUrl(null)
               setPlayingText(null)
             })
@@ -284,7 +307,7 @@ export default function Dashboard() {
             audioRef.current = a2
             a2.play().finally(() => {
               a2.addEventListener('ended', () => {
-                try { URL.revokeObjectURL(url2) } catch (e) {}
+                try { URL.revokeObjectURL(url2) } catch (e) { }
                 setPlayingUrl(null)
                 setPlayingText(null)
               })
@@ -342,7 +365,7 @@ export default function Dashboard() {
                 appendNext()
                 // start playback once we have some data
                 if (audioEl.paused) {
-                  try { audioEl.play().catch(() => {}) } catch (e) {}
+                  try { audioEl.play().catch(() => { }) } catch (e) { }
                 }
               }
 
@@ -354,16 +377,16 @@ export default function Dashboard() {
                 sourceBuffer.addEventListener('updateend', onUpd)
               })
               await waitForUpdate()
-              try { mediaSource.endOfStream() } catch (e) {}
+              try { mediaSource.endOfStream() } catch (e) { }
             } catch (e) {
               console.warn('MediaSource streaming failed', e)
-              try { mediaSource.endOfStream() } catch (ee) {}
+              try { mediaSource.endOfStream() } catch (ee) { }
             }
           })
 
           // cleanup handlers
           audioEl.addEventListener('ended', () => {
-            try { URL.revokeObjectURL(url) } catch (e) {}
+            try { URL.revokeObjectURL(url) } catch (e) { }
             setPlayingUrl(null)
             setPlayingText(null)
           })
@@ -384,7 +407,7 @@ export default function Dashboard() {
       a.play().finally(() => {
         // cleanup when finished
         a.addEventListener('ended', () => {
-          try { URL.revokeObjectURL(url) } catch (e) {}
+          try { URL.revokeObjectURL(url) } catch (e) { }
           setPlayingUrl(null)
           setPlayingText(null)
         })
@@ -398,8 +421,8 @@ export default function Dashboard() {
   }
 
   const stopAssistantAudio = () => {
-    try { audioRef.current?.pause?.(); } catch (e) {}
-    try { if (playingUrl) URL.revokeObjectURL(playingUrl) } catch (e) {}
+    try { audioRef.current?.pause?.(); } catch (e) { }
+    try { if (playingUrl) URL.revokeObjectURL(playingUrl) } catch (e) { }
     audioRef.current = null
     setPlayingUrl(null)
     setPlayingText(null)
@@ -598,7 +621,8 @@ export default function Dashboard() {
                     // set in-memory ref for immediate availability to chat sender
                     whiteboardImageRef.current = { id: selectedId, raw, contentType: contentType || 'image/png', dataUrl: imgData }
 
-                    setConversations((list) => list.map((c) => c.id === selectedId ? ({ ...c,
+                    setConversations((list) => list.map((c) => c.id === selectedId ? ({
+                      ...c,
                       whiteboardImage: imgData,
                       whiteboardImageBase64: raw,
                       whiteboardImageContentType: contentType || 'image/png'
@@ -619,7 +643,8 @@ export default function Dashboard() {
                       console.warn('could not parse whiteboard data URL on save', e)
                     }
                     whiteboardImageRef.current = { id: selectedId, raw, contentType: contentType || 'image/png', dataUrl: imgData }
-                    setConversations((list) => list.map((c) => c.id === selectedId ? ({ ...c,
+                    setConversations((list) => list.map((c) => c.id === selectedId ? ({
+                      ...c,
                       whiteboardImage: imgData,
                       whiteboardImageBase64: raw,
                       whiteboardImageContentType: contentType || 'image/png'
