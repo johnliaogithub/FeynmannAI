@@ -6,6 +6,11 @@ const Auth = dynamic(() => import('../components/Auth'), { ssr: false })
 
 const VoiceTutor = dynamic(() => import('../components/VoiceTutor'), { ssr: false })
 const RecorderUpload = dynamic(() => import('../components/RecorderUpload'), { ssr: false })
+import ReactMarkdown from 'react-markdown'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
+import 'katex/dist/katex.min.css'
+
 const Whiteboard = dynamic(() => import('../components/Whiteboard'), { ssr: false })
 
 export default function Dashboard() {
@@ -130,6 +135,15 @@ export default function Dashboard() {
   const handleTranscript = (text) => {
     const entry = { role: 'user', text, _local: true }
     setConversations((list) => list.map((c) => c.id === selectedId ? { ...c, messages: [...c.messages, entry] } : c))
+  }
+
+  const preprocessLaTeX = (content) => {
+    if (!content) return ''
+    // Replace \[ ... \] with $$ ... $$
+    const blockReplaced = content.replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$')
+    // Replace \( ... \) with $ ... $
+    const inlineReplaced = blockReplaced.replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$')
+    return inlineReplaced
   }
 
   // send transcript to backend chat endpoint and append Gemini reply
@@ -553,7 +567,7 @@ export default function Dashboard() {
                   const firstName = (user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'You')?.split?.(' ')[0] || 'You'
                   const label = m.role === 'user' ? firstName : (m.role === 'assistant' ? 'Clueless Learner' : m.role)
                   return (
-                    <div key={i} className={`p-3 rounded-md bg-slate-700/60 text-slate-200` }>
+                    <div key={i} className={`p-3 rounded-md bg-slate-700/60 text-slate-200`}>
                       <div className="flex items-center justify-between">
                         <div className="text-sm"><strong>{label}</strong></div>
                         {m.role === 'assistant' && (
@@ -578,7 +592,14 @@ export default function Dashboard() {
                           </div>
                         )}
                       </div>
-                      <div className="mt-1">{m.text}</div>
+                      <div className="mt-1 prose prose-invert max-w-none text-slate-200">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkMath]}
+                          rehypePlugins={[rehypeKatex]}
+                        >
+                          {preprocessLaTeX(m.text)}
+                        </ReactMarkdown>
+                      </div>
                     </div>
                   )
                 })}
@@ -594,7 +615,7 @@ export default function Dashboard() {
                       // Upload via same-origin proxy to avoid CORS and keep conversion
                       handleTranscriptAndChat(txt)
                     }}
-                    onRecordingStart={() => { try { stopAssistantAudio() } catch (e) {} }}
+                    onRecordingStart={() => { try { stopAssistantAudio() } catch (e) { } }}
                   />
                 </div>
               </div>
