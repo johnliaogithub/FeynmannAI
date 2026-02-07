@@ -34,6 +34,61 @@ Tech stack:
     • Gemini API for conversational reasoning
     • ElevenLabs for speech-to-text and text-to-speech
     • Python
+
+==========================
+Setup Instructions
+
+1.  **Clone the repository** (if you haven't already):
+    ```bash
+    git clone git@github.com:johnliaogithub/FeynmannAI.git
+    cd FeynmannAI/backend
+    ```
+
+2.  **Create a virtual environment**:
+    ```bash
+    python -m venv env
+    ```
+
+3.  **Activate the virtual environment**:
+    - On Windows:
+        ```bash
+        .\env\Scripts\activate
+        ```
+    - On macOS/Linux:
+        ```bash
+        source env/bin/activate
+        ```
+
+4.  **Install dependencies**:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+5.  **Set up environment variables**:
+    - Create a `.env` file in the `backend` directory.
+    - Add your API keys:
+        ```env
+        OPENAI_API_KEY=your_openai_api_key
+        ELEVENLABS_API_KEY=your_elevenlabs_api_key
+        ```
+
+==========================
+How to Run
+
+1.  **Start the Backend Server**:
+    Ensure your virtual environment is activated, then run:
+    ```bash
+    uvicorn main:app --reload
+    ```
+    The server will start at `http://127.0.0.1:8000`.
+
+2.  **Test Text-to-Speech (Optional)**:
+    You can test the ElevenLabs integration by running:
+    ```bash
+    python test_tts.py
+    ```
+    This will generate an `output.mp3` file in the directory if successful.
+
 ==========================
 Example use cases
     • Studying for exams by explaining concepts out loud
