@@ -10,7 +10,7 @@ function extensionForMime(mime) {
   return 'webm'
 }
 
-export default function RecorderUpload({ endpoint = '/api/proxy-transcribe', onTranscribed }) {
+export default function RecorderUpload({ endpoint = '/api/proxy-transcribe', onTranscribed, onRecordingStart }) {
   const [recording, setRecording] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [message, setMessage] = useState('')
@@ -97,6 +97,8 @@ export default function RecorderUpload({ endpoint = '/api/proxy-transcribe', onT
       const mr = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream)
       chunksRef.current = []
       mr.ondataavailable = (e) => { if (e.data && e.data.size) chunksRef.current.push(e.data) }
+      // Notify parent that recording is starting (so TTS can be stopped)
+      try { onRecordingStart && onRecordingStart() } catch (e) {}
       mr.onstop = async () => {
         const rawBlob = new Blob(chunksRef.current, { type: mimeRef.current || 'audio/webm' })
         // try to convert to WAV for better backend compatibility, but don't block too long
@@ -190,14 +192,33 @@ export default function RecorderUpload({ endpoint = '/api/proxy-transcribe', onT
       fd.append('file', file)
 
       // use AbortController to avoid hanging uploads
-      const controller = new AbortController()
-      const timeoutMs = 30000
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+      // Use a longer timeout for uploads and retry once on abort
+      const tryUpload = async () => {
+        const controller = new AbortController()
+        const timeoutMs = 120000 // 2 minutes
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+        let res
+        try {
+          res = await fetch(endpoint, { method: 'POST', body: fd, signal: controller.signal })
+          return res
+        } finally {
+          clearTimeout(timeoutId)
+        }
+      }
+
       let res
       try {
-        res = await fetch(endpoint, { method: 'POST', body: fd, signal: controller.signal })
-      } finally {
-        clearTimeout(timeoutId)
+        res = await tryUpload()
+      } catch (e) {
+        // retry once if aborted
+        if (e && e.name === 'AbortError') {
+          console.warn('Upload aborted — retrying once')
+          try {
+            res = await tryUpload()
+          } catch (err2) {
+            throw err2
+          }
+        } else throw e
       }
       if (!res.ok) {
         const text = await res.text().catch(() => '')
@@ -278,16 +299,14 @@ export default function RecorderUpload({ endpoint = '/api/proxy-transcribe', onT
       <div className="flex items-start justify-between">
         <div className="flex-1 flex flex-col items-start">
           {!recording ? (
-            <button onClick={start} className="px-6 py-3 bg-primary rounded-md text-slate-900 text-lg font-semibold shadow">Start Recording</button>
+            <button onClick={start} className="w-full px-6 py-3 bg-primary rounded-md text-slate-900 text-lg font-semibold shadow">Click here or press enter to start recording</button>
           ) : (
-            <button onClick={stop} className="px-6 py-3 bg-rose-500 rounded-md text-white text-lg font-semibold shadow">Stop</button>
+            <button onClick={stop} className="w-full px-6 py-3 bg-rose-500 rounded-md text-white text-lg font-semibold shadow">Stop</button>
           )}
           <div className="mt-2 text-sm text-slate-400">{uploading ? 'Uploading…' : message}</div>
-          <div className="mt-1 text-base text-slate-200 font-medium">{recording ? 'Press Enter to stop' : 'Press Enter to start'}</div>
+          {/* helper text removed — label shown on button */}
         </div>
-        <div className="flex-shrink-0 self-start">
-          <button onClick={() => { if (mediaRef.current && mediaRef.current.state !== 'inactive') stop() }} className="px-3 py-2 bg-slate-700 rounded-md text-sm">Cancel</button>
-        </div>
+        {/* Cancel button removed per request */}
       </div>
     </div>
   )

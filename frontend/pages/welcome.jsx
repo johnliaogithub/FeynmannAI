@@ -9,7 +9,7 @@ export default function Welcome() {
         <div className="flex items-center gap-4">
           <button onClick={() => router.push('/')} className="flex items-center gap-3">
             <div className="w-10 h-10 bg-primary rounded flex items-center justify-center text-black font-bold">F</div>
-            <span className="text-xl font-semibold">FeynmanAI</span>
+            <span className="text-xl font-semibold">FeynmannAI</span>
           </button>
         </div>
 
@@ -27,29 +27,71 @@ export default function Welcome() {
 
         <section className="bg-white dark:bg-slate-800 rounded p-6 shadow">
           <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-4 bg-white dark:bg-slate-900 rounded shadow">
+            <div className="p-4 bg-white dark:bg-slate-900 rounded shadow flex flex-col items-center text-center">
               <h3 className="font-semibold">John Liao</h3>
               <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">Bio or role — add details later.</p>
+              <div className="mt-3">
+                <a
+                  href="https://www.linkedin.com/in/john-liao-1b8452317/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  LinkedIn
+                </a>
+              </div>
             </div>
 
-            <div className="p-4 bg-white dark:bg-slate-900 rounded shadow">
+            <div className="p-4 bg-white dark:bg-slate-900 rounded shadow flex flex-col items-center text-center">
+              <h3 className="font-semibold">Jonathan Xiao</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">Worked on the frontend and transcript API.</p>
+              <div className="mt-3">
+                <a
+                  href="https://www.linkedin.com/in/jonathancxiao"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  LinkedIn
+                </a>
+              </div>
+            </div>
+
+            <div className="p-4 bg-white dark:bg-slate-900 rounded shadow flex flex-col items-center text-center">
               <h3 className="font-semibold">Julia Miao</h3>
               <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">Bio or role — add details later.</p>
+              <div className="mt-3">
+                <a
+                  href="https://www.linkedin.com/in/julia-miao-116a0537a/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  LinkedIn
+                </a>
+              </div>
             </div>
 
-            <div className="p-4 bg-white dark:bg-slate-900 rounded shadow">
+            <div className="p-4 bg-white dark:bg-slate-900 rounded shadow flex flex-col items-center text-center">
               <h3 className="font-semibold">Sami Hassan</h3>
               <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">Contributed to backend development.</p>
+              <div className="mt-3">
+                <a
+                  href="https://www.linkedin.com/in/sami-hassan-75b5b638a/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  LinkedIn
+                </a>
+              </div>
             </div>
 
-            <div className="p-4 bg-white dark:bg-slate-900 rounded shadow">
-              <h3 className="font-semibold">Jonathan Xiao</h3>
-              <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">Worked on the frontend and APIs.</p>
-            </div>
+            
           </div>
 
-          <div className="mt-6 flex gap-3">
-            <button onClick={() => router.push('/dashboard')} className="px-4 py-2 bg-primary rounded text-black">Go to Conversations</button>
+          <div className="mt-6">
+            <button onClick={() => router.push('/dashboard')} className="w-full px-4 py-2 bg-primary rounded text-black">Go to Conversations</button>
           </div>
         </section>
       </main>
