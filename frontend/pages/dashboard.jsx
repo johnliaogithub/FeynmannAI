@@ -30,7 +30,7 @@ export default function Dashboard() {
         // Migration: if old single-conversation key exists, migrate it
         const oldRaw = localStorage.getItem(`conversation:${u.id}`)
         const newRaw = localStorage.getItem(`conversations:${u.id}`)
-        if (!newRaw && oldRaw) {
+          if (!newRaw && oldRaw) {
           const msgs = JSON.parse(oldRaw)
           const conv = { id: `c-${Date.now()}`, title: 'Conversation 1', messages: msgs || [], createdAt: Date.now() }
           localStorage.setItem(`conversations:${u.id}`, JSON.stringify([conv]))
@@ -86,7 +86,7 @@ export default function Dashboard() {
   }, [conversations, selectedId])
 
   const handleTranscript = (text) => {
-    const entry = { role: 'user', text }
+    const entry = { role: 'user', text, _local: true }
     setConversations((list) => list.map((c) => c.id === selectedId ? { ...c, messages: [...c.messages, entry] } : c))
   }
 
@@ -95,28 +95,54 @@ export default function Dashboard() {
     if (!text) return
     const userEntry = { role: 'user', text }
     const pendingAssistant = { role: 'assistant', text: 'Thinking...', _pending: true }
-    setConversations((list) => list.map((c) => c.id === selectedId ? { ...c, messages: [...c.messages, userEntry, pendingAssistant] } : c))
+    // if a local placeholder exists as the last user message, replace it
+    setConversations((list) => list.map((c) => {
+      if (c.id !== selectedId) return c
+      const last = c.messages[c.messages.length - 1]
+      let msgs = c.messages
+      if (last && last.role === 'user' && last._local) {
+        msgs = [...c.messages.slice(0, -1), userEntry, pendingAssistant]
+      } else {
+        msgs = [...c.messages, userEntry, pendingAssistant]
+      }
+      return { ...c, messages: msgs }
+    }))
 
     try {
-      const res = await fetch('/api/proxy-chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
-      })
+      const conv = getSelectedConversation()
+      const payload = { text }
+      if (conv?.geminiSessionId) payload.session_id = conv.geminiSessionId
+      console.log('proxy /api/proxy-chat sending payload', payload)
+      const controller = new AbortController()
+      const timeoutMs = 25000
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+      let res
+      try {
+        res = await fetch('/api/proxy-chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        })
+      } finally {
+        clearTimeout(timeoutId)
+      }
       if (!res.ok) {
         const txt = await res.text().catch(() => '')
         throw new Error(`Server ${res.status}: ${txt}`)
       }
       const data = await res.json().catch(() => ({}))
+      console.log('proxy /api/proxy-chat response:', data)
       const reply = data?.response || data?.transcription || data?.text || ''
       const final = reply && reply.trim() ? reply : '[no reply]'
 
-      // replace the pending assistant message with final reply
+      // replace the pending assistant message with final reply and save gemini session id if provided
+      const sessionId = data?.session_id || data?.session || data?.gemini_session_id || data?.sessionId || null
       setConversations((list) => list.map((c) => {
-        if (c.id !== selectedId) return c
-        const msgs = c.messages.map((m) => m._pending ? ({ role: 'assistant', text: final }) : m)
-        return { ...c, messages: msgs }
-      }))
+          if (c.id !== selectedId) return c
+          const msgs = c.messages.map((m) => m._pending ? ({ role: 'assistant', text: final }) : m)
+          return { ...c, messages: msgs }
+        }))
     } catch (e) {
       console.error('Chat error', e)
       const errText = `Error: ${e.message || 'chat failed'}`
@@ -131,7 +157,7 @@ export default function Dashboard() {
   const getSelectedConversation = () => conversations.find((c) => c.id === selectedId) || null
 
   const createConversation = (title) => {
-    const conv = { id: `c-${Date.now()}`, title: title || `Conversation ${conversations.length + 1}`, messages: [], createdAt: Date.now() }
+    const conv = { id: `c-${Date.now()}`, title: title || `Conversation ${conversations.length + 1}`, messages: [], createdAt: Date.now(), geminiSessionId: null }
     setConversations((s) => [conv, ...s])
     setSelectedId(conv.id)
   }
@@ -149,7 +175,7 @@ export default function Dashboard() {
     setConversations((s) => {
       const next = s.filter((x) => x.id !== id)
       if (next.length === 0) {
-        const conv = { id: `c-${Date.now()}`, title: 'Conversation 1', messages: [], createdAt: Date.now() }
+        const conv = { id: `c-${Date.now()}`, title: 'Conversation 1', messages: [], createdAt: Date.now(), geminiSessionId: null }
         setSelectedId(conv.id)
         return [conv]
       }
@@ -238,7 +264,7 @@ export default function Dashboard() {
               <div className="flex items-center gap-4">
                 <div className="flex-1">
                   <RecorderUpload endpoint="http://127.0.0.1:8000/transcribe-audio/" onTranscribed={(txt) => {
-                    // when a transcription arrives, append as user message and call backend chat
+                    // Use backend transcription endpoint directly (restored working flow)
                     handleTranscriptAndChat(txt)
                   }} />
                 </div>
