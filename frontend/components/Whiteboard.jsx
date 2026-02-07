@@ -157,7 +157,17 @@ export default function Whiteboard({ onClose, initialImage }) {
     try {
       const canvas = canvasRef.current
       if (canvas && onClose) {
-        const data = canvas.toDataURL('image/png')
+        // Ensure exported image has a white background (avoid transparency)
+        const exportCanvas = document.createElement('canvas')
+        exportCanvas.width = canvas.width
+        exportCanvas.height = canvas.height
+        const exCtx = exportCanvas.getContext('2d')
+        // Fill with white
+        exCtx.fillStyle = '#ffffff'
+        exCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height)
+        // Draw original canvas on top
+        exCtx.drawImage(canvas, 0, 0)
+        const data = exportCanvas.toDataURL('image/png')
         onClose(data)
         return
       }

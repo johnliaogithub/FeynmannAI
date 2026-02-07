@@ -85,6 +85,7 @@ export default async function handler(req, res) {
     const defaultUrl = `${protocol}://${host}`
 
     const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL || defaultUrl}${clientRedirect}${hash}`
+    
     return res.redirect(redirectTo)
   } catch (e) {
     console.error('Exchange error', e)

@@ -6,12 +6,19 @@ export default async function handler(req, res) {
   }
 
   const candidates = []
-  const env = process.env.TRANSCRIBE_BACKEND_URL
+  // Prefer explicit env var (use Vercel env var NEXT_PUBLIC_API_URL or TRANSCRIBE_BACKEND_URL)
+  const env = process.env.NEXT_PUBLIC_API_URL || process.env.TRANSCRIBE_BACKEND_URL
   if (env) candidates.push(env.replace(/\/$/, ''))
-  candidates.push('http://127.0.0.1:8000')
-  candidates.push('http://localhost:8000')
-  candidates.push('http://0.0.0.0:8000')
-  candidates.push('http://host.docker.internal:8000')
+  else {
+    // Derive from incoming request (handles deployed domains) and include common local fallbacks
+    const host = req.headers.host || '127.0.0.1:8000'
+    const proto = req.headers['x-forwarded-proto'] || req.headers['x-forwarded-protocol'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'http'
+    candidates.push(`${proto}://${host}`)
+    candidates.push('http://127.0.0.1:8000')
+    candidates.push('http://localhost:8000')
+    candidates.push('http://0.0.0.0:8000')
+    candidates.push('http://host.docker.internal:8000')
+  }
 
   const results = {}
   for (const base of candidates) {
