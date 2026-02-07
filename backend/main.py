@@ -15,6 +15,7 @@ import uuid
 from typing import Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
 from eval import evaluator_chain   
+from pypdf import PdfReader
 
 
 # 1. Load Keys
@@ -276,4 +277,66 @@ async def speak_text(request: SpeakRequest, background_tasks: BackgroundTasks ):
         )
     except Exception as e:
         print(f"Server Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/upload-notes/")
+async def upload_notes(
+    file: UploadFile = File(...), 
+    session_id: Optional[str] = Form(None) # We need to know WHICH thread to add notes to
+):
+    try:
+        # 1. Extract Text based on file type
+        text_content = ""
+        
+        if file.filename.endswith(".pdf"):
+            reader = PdfReader(file.file)
+            for page in reader.pages:
+                text_content += page.extract_text() + "\n"
+                
+        elif file.filename.endswith((".txt", ".md")):
+            text_content = (await file.read()).decode("utf-8")
+            
+        else:
+            raise HTTPException(400, "Unsupported file type. Use PDF, TXT, or MD.")
+
+        # 2. Format the Injection
+        # We wrap it in a clear block so the AI knows this is "Reference Material"
+        # and not the user chatting.
+        context_injection = f"""
+        [SYSTEM: NEW KNOWLEDGE UPLOADED]
+        The user has uploaded the following class notes. 
+        Use these notes to inform your questions and check the user's understanding.
+        
+        --- BEGIN NOTES ---
+        {text_content}
+        --- END NOTES ---
+        """
+
+        # 3. Handle Session ID
+        if session_id:
+            thread_id = session_id
+        else:
+            thread = await client_backboard.create_thread(assistant_id=assistant_id)
+            thread_id = str(thread.thread_id)
+
+        # 4. Send to Backboard (Memory)
+        # We add this to the thread history so the AI "remembers" it forever.
+        # We don't necessarily need the AI to reply to this, but Backboard 
+        # usually returns a response.
+        response = await client_backboard.add_message(
+            thread_id=thread_id,
+            content=context_injection
+        )
+
+        return {
+            "status": "success", 
+            "message": "Notes processed and added to AI memory.",
+            "ai_confirmation": response.content,
+            "session_id": thread_id
+        }
+
+    except Exception as e:
+        print(f"Notes Upload Error: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
