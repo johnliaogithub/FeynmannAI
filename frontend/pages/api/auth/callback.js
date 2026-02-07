@@ -14,7 +14,15 @@ export default async function handler(req, res) {
     // the browser to the app with the fragment preserved so the frontend
     // can pick up the `access_token` and `refresh_token`.
     const clientRedirectFallback = clientRedirect || '/dashboard'
-    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '')
+
+    // Determine the base URL from the request headers if the env var is not set
+    const protocol = req.headers['x-forwarded-proto'] || 'http'
+    const host = req.headers['x-forwarded-host'] || req.headers.host
+    const defaultUrl = host ? `${protocol}://${host}` : null
+
+    // Prioritize the URL from headers so Vercel previews work even if NEXT_PUBLIC_APP_URL is set to localhost
+    const appUrl = (defaultUrl || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '')
+    console.log('Auth callback debug:', { headers: req.headers, defaultUrl, appUrl, envUrl: process.env.NEXT_PUBLIC_APP_URL })
     const forwardUrl = `${appUrl}${clientRedirectFallback}`
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Auth callback</title></head><body>
     <p>Processing sign-in… If you are not redirected, <a id="link" href="${forwardUrl}">continue</a>.</p>
@@ -73,7 +81,16 @@ export default async function handler(req, res) {
 
     // Redirect to client with tokens in the hash so client-side can set the session
     const hash = `#access_token=${encodeURIComponent(data.access_token || '')}&refresh_token=${encodeURIComponent(data.refresh_token || '')}&expires_in=${encodeURIComponent(data.expires_in || '')}`
-    const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}${clientRedirect}${hash}`
+    // Determine the base URL from the request headers if the env var is not set
+    const protocol = req.headers['x-forwarded-proto'] || 'http'
+    const rawHost = req.headers['x-forwarded-host'] || req.headers.host
+    const host = Array.isArray(rawHost) ? rawHost[0] : rawHost
+    const defaultUrl = host ? `${protocol}://${host}` : null
+
+    console.log('PKCE Flow Debug:', { headers: req.headers, host, defaultUrl, envUrl: process.env.NEXT_PUBLIC_APP_URL })
+
+    const redirectTo = `${defaultUrl || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}${clientRedirect}${hash}`
+
     return res.redirect(redirectTo)
   } catch (e) {
     console.error('Exchange error', e)

@@ -1,74 +1,36 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/router'
-import dynamic from 'next/dynamic'
 import Auth from '../components/Auth'
 
-const VoiceTutor = dynamic(() => import('../components/VoiceTutor'), { ssr: false })
-
 export default function Home() {
-  const [conversation, setConversation] = useState([])
   const [user, setUser] = useState(null)
-
   const router = useRouter()
 
-  useEffect(() => {
-    if (user) router.push('/dashboard')
-  }, [user, router])
-
-  const handleTranscript = (text) => {
-    const entry = { role: 'user', text }
-    setConversation((c) => [...c, entry])
-  }
-
   return (
-    <main className="container">
-      <section className="hero">
-        <div className="heroInner">
-          <h1 className="title">FeynmanAI</h1>
-          <p className="tagline">Practice explaining ideas aloud and get guiding questions to sharpen your understanding.</p>
-
-          <div className="cta">
-            <Auth onUser={setUser} redirectTo="/dashboard" />
-            <button className="secondary" onClick={() => router.push('/dashboard')}>Open Dashboard</button>
-          </div>
-
-          <div className="features">
-            <div className="feature">
-              <strong>Speak naturally</strong>
-              <div style={{ marginTop: 8, color: '#475569' }}>Use your voice to explain a concept — FeynmanAI listens.</div>
-            </div>
-            <div className="feature">
-              <strong>Clarifying questions</strong>
-              <div style={{ marginTop: 8, color: '#475569' }}>Get targeted questions that reveal gaps in your explanation.</div>
-            </div>
-            <div className="feature">
-              <strong>Save conversations</strong>
-              <div style={{ marginTop: 8, color: '#475569' }}>Multiple conversation slots let you track practice sessions.</div>
-            </div>
-          </div>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+      <header className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button onClick={() => router.push('/')} className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-primary rounded flex items-center justify-center text-black font-bold">F</div>
+            <span className="text-xl font-semibold">FeynmanAI</span>
+          </button>
         </div>
 
-        <div className="heroGraphic">🎙️</div>
-      </section>
+        <nav className="flex items-center gap-4">
+          <button onClick={() => router.push('/dashboard')} className="px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-800">Conversations</button>
+          <button onClick={() => router.push('/welcome')} className="px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-800">About</button>
+          <Auth onUser={setUser} redirectTo={null} />
+        </nav>
+      </header>
 
-      {user && (
-        <section style={{ marginTop: 28 }} className="panel">
-          <h3>Quick start</h3>
-          <p style={{ color: '#475569' }}>Click Start and speak. The AI will respond with clarifying questions.</p>
-          <div style={{ marginTop: 12 }}>
-            <VoiceTutor onTranscript={handleTranscript} />
-          </div>
+      <main className="max-w-4xl mx-auto px-6 py-32 flex flex-col items-center text-center">
+        <div className="mb-8">
+          <div className="w-32 h-32 bg-primary rounded-full flex items-center justify-center text-black text-3xl font-bold">F</div>
+        </div>
 
-          <div style={{ marginTop: 16 }}>
-            <h4>Recent</h4>
-            <div style={{ whiteSpace: 'pre-wrap' }}>
-              {conversation.map((m, i) => (
-                <div key={i}><strong>{m.role}:</strong> {m.text}</div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-    </main>
+        <h1 className="text-5xl font-extrabold mb-4">Practice explaining ideas aloud</h1>
+        <p className="text-lg text-slate-600 dark:text-slate-300 max-w-2xl">Record short explanations, get targeted follow-up questions, and iterate until you understand a concept deeply.</p>
+      </main>
+    </div>
   )
 }

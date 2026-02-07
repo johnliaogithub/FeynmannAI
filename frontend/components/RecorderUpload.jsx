@@ -10,7 +10,7 @@ function extensionForMime(mime) {
   return 'webm'
 }
 
-export default function RecorderUpload({ endpoint = 'http://127.0.0.1:8000/transcribe-audio/', onTranscribed }) {
+export default function RecorderUpload({ endpoint = '/api/proxy-transcribe', onTranscribed }) {
   const [recording, setRecording] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [message, setMessage] = useState('')

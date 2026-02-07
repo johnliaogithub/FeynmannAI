@@ -38,7 +38,7 @@ export default function Auth({ onUser, redirectTo = '/dashboard' }) {
       try {
         const cleaned = window.location.origin + window.location.pathname
         window.history.replaceState({}, document.title, cleaned)
-      } catch (e) {}
+      } catch (e) { }
     }
 
     // Attempt to restore session from URL hash, then load current session.
@@ -49,8 +49,11 @@ export default function Auth({ onUser, redirectTo = '/dashboard' }) {
         setUser(u)
         onUser && onUser(u)
         setInitializing(false)
-        if (u) {
-          try { router.replace('/dashboard') } catch (e) {}
+        if (u && redirectTo) {
+          console.log('Auth component redirecting to:', redirectTo)
+          try { router.replace(redirectTo) } catch (e) {
+            console.error('Router replace error', e)
+          }
         }
       })
     })
@@ -73,8 +76,9 @@ export default function Auth({ onUser, redirectTo = '/dashboard' }) {
       // Start OAuth and request Supabase redirect back to the chosen path.
       // Redirect to our server callback which will perform the token exchange
       const callbackUrl = typeof window !== 'undefined'
-        ? window.location.origin + `/api/auth/callback?redirect_to=${encodeURIComponent(redirectTo)}`
+        ? window.location.origin + `/api/auth/callback${redirectTo ? `?redirect_to=${encodeURIComponent(redirectTo)}` : ''}`
         : undefined
+      console.log('Initiating OAuth with callbackUrl:', callbackUrl)
       await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: callbackUrl } })
     } catch (e) {
       console.error('Sign-in error', e)
@@ -87,7 +91,7 @@ export default function Auth({ onUser, redirectTo = '/dashboard' }) {
       setError(null)
       setMagicMsg(null)
       if (!email) return setError('Enter an email address')
-      const redirectUrl = typeof window !== 'undefined' ? window.location.origin + redirectTo : undefined
+      const redirectUrl = typeof window !== 'undefined' && redirectTo ? window.location.origin + redirectTo : undefined
       const { data, error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectUrl } })
       if (error) throw error
       setMagicMsg('Magic link sent to ' + email + '. Check your inbox.')
@@ -105,8 +109,8 @@ export default function Auth({ onUser, redirectTo = '/dashboard' }) {
     const demo = { id: 'dev', email: 'dev@local', user_metadata: { full_name: 'Demo User' } }
     setUser(demo)
     onUser && onUser(demo)
-    try { window.localStorage.setItem('demo_user', JSON.stringify(demo)) } catch (e) {}
-    try { const redirectUrl = typeof window !== 'undefined' ? window.location.origin + redirectTo : '/' ; window.location.replace(redirectUrl) } catch (e) {}
+    try { window.localStorage.setItem('demo_user', JSON.stringify(demo)) } catch (e) { }
+    try { const redirectUrl = typeof window !== 'undefined' && redirectTo ? window.location.origin + redirectTo : '/'; window.location.replace(redirectUrl) } catch (e) { }
   }
 
   if (initializing) return <div>Loading…</div>
