@@ -5,9 +5,9 @@ export default async function handler(req, res) {
     return res.status(405).end('Method Not Allowed')
   }
 
-  const backend = process.env.TRANSCRIBE_BACKEND_URL || 'http://127.0.0.1:8000'
+  const backend = (process.env.TRANSCRIBE_BACKEND_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
   try {
-    console.log('proxy-speak: forwarding to backend', backend + '/speak/')
+    // console.log('proxy-speak: forwarding to backend', backend + '/speak/')
     const backendRes = await fetch(`${backend}/speak/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
