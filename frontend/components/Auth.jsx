@@ -50,9 +50,16 @@ export default function Auth({ onUser, redirectTo = '/dashboard' }) {
         onUser && onUser(u)
         setInitializing(false)
         if (u && redirectTo) {
-          console.log('Auth component redirecting to:', redirectTo)
-          try { router.replace(redirectTo) } catch (e) {
-            console.error('Router replace error', e)
+          const currentPath = window.location.pathname
+          // Prevent redundant redirects which might be causing issues on some environments
+          if (currentPath === redirectTo) {
+            console.log('Auth: Already at target path, clearing hash only')
+            try { window.history.replaceState(null, '', currentPath) } catch (e) { }
+          } else {
+            console.log('Auth component redirecting to:', redirectTo)
+            try { router.replace(redirectTo) } catch (e) {
+              console.error('Router replace error', e)
+            }
           }
         }
       })
