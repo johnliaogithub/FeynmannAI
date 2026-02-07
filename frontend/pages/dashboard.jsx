@@ -51,7 +51,7 @@ export default function Dashboard() {
         // Migration: if old single-conversation key exists, migrate it
         const oldRaw = localStorage.getItem(`conversation:${u.id}`)
         const newRaw = localStorage.getItem(`conversations:${u.id}`)
-          if (!newRaw && oldRaw) {
+        if (!newRaw && oldRaw) {
           const msgs = JSON.parse(oldRaw)
           const conv = { id: `c-${Date.now()}`, title: 'Conversation 1', messages: msgs || [], createdAt: Date.now() }
           localStorage.setItem(`conversations:${u.id}`, JSON.stringify([conv]))
@@ -89,7 +89,7 @@ export default function Dashboard() {
     try {
       localStorage.setItem(`conversations:${user.id}`, JSON.stringify(conversations))
       if (selectedId) localStorage.setItem(`conversations:selected:${user.id}`, selectedId)
-    } catch (e) {}
+    } catch (e) { }
   }, [conversations, selectedId, user])
 
   // auto-scroll messages container to bottom on new messages / selection change (smooth)
@@ -103,7 +103,7 @@ export default function Dashboard() {
       } else {
         el.scrollTop = el.scrollHeight
       }
-    } catch (e) {}
+    } catch (e) { }
   }, [conversations, selectedId])
 
   const handleTranscript = (text) => {
@@ -114,20 +114,24 @@ export default function Dashboard() {
   // send transcript to backend chat endpoint and append Gemini reply
   const handleTranscriptAndChat = async (text) => {
     if (!text) return
+    console.log('handleTranscriptAndChat starting', { text, selectedId })
     const userEntry = { role: 'user', text }
     const pendingAssistant = { role: 'assistant', text: 'Thinking...', _pending: true }
     // if a local placeholder exists as the last user message, replace it
-    setConversations((list) => list.map((c) => {
-      if (c.id !== selectedId) return c
-      const last = c.messages[c.messages.length - 1]
-      let msgs = c.messages
-      if (last && last.role === 'user' && last._local) {
-        msgs = [...c.messages.slice(0, -1), userEntry, pendingAssistant]
-      } else {
-        msgs = [...c.messages, userEntry, pendingAssistant]
-      }
-      return { ...c, messages: msgs }
-    }))
+    setConversations((list) => {
+      console.log('setConversations (pending update)', { selectedId, listLen: list.length })
+      return list.map((c) => {
+        if (c.id !== selectedId) return c
+        const last = c.messages[c.messages.length - 1]
+        let msgs = c.messages
+        if (last && last.role === 'user' && last._local) {
+          msgs = [...c.messages.slice(0, -1), userEntry, pendingAssistant]
+        } else {
+          msgs = [...c.messages, userEntry, pendingAssistant]
+        }
+        return { ...c, messages: msgs }
+      })
+    })
 
     try {
       const conv = getSelectedConversation()
@@ -173,11 +177,14 @@ export default function Dashboard() {
 
       // replace the pending assistant message with final reply and save gemini session id if provided
       const sessionId = data?.session_id || data?.session || data?.gemini_session_id || data?.sessionId || null
-      setConversations((list) => list.map((c) => {
+      setConversations((list) => {
+        console.log('setConversations (final update)', { selectedId, reply: final })
+        return list.map((c) => {
           if (c.id !== selectedId) return c
           const msgs = c.messages.map((m) => m._pending ? ({ role: 'assistant', text: final }) : m)
           return { ...c, messages: msgs, geminiSessionId: sessionId || c.geminiSessionId }
-        }))
+        })
+      })
 
       // Auto-play assistant reply TTS
       try { playAssistantAudio(final) } catch (e) { console.warn('Auto-play failed', e) }
@@ -206,7 +213,7 @@ export default function Dashboard() {
     setTtsLoadingText(text)
     try {
       // stop any existing playback
-      try { audioRef.current?.pause?.(); URL.revokeObjectURL(playingUrl) } catch (e) {}
+      try { audioRef.current?.pause?.(); URL.revokeObjectURL(playingUrl) } catch (e) { }
       setPlayingUrl(null)
       setPlayingText(null)
 
@@ -264,7 +271,7 @@ export default function Dashboard() {
           audioRef.current = a
           a.play().finally(() => {
             a.addEventListener('ended', () => {
-              try { URL.revokeObjectURL(url) } catch (e) {}
+              try { URL.revokeObjectURL(url) } catch (e) { }
               setPlayingUrl(null)
               setPlayingText(null)
             })
@@ -284,7 +291,7 @@ export default function Dashboard() {
             audioRef.current = a2
             a2.play().finally(() => {
               a2.addEventListener('ended', () => {
-                try { URL.revokeObjectURL(url2) } catch (e) {}
+                try { URL.revokeObjectURL(url2) } catch (e) { }
                 setPlayingUrl(null)
                 setPlayingText(null)
               })
@@ -342,7 +349,7 @@ export default function Dashboard() {
                 appendNext()
                 // start playback once we have some data
                 if (audioEl.paused) {
-                  try { audioEl.play().catch(() => {}) } catch (e) {}
+                  try { audioEl.play().catch(() => { }) } catch (e) { }
                 }
               }
 
@@ -354,16 +361,16 @@ export default function Dashboard() {
                 sourceBuffer.addEventListener('updateend', onUpd)
               })
               await waitForUpdate()
-              try { mediaSource.endOfStream() } catch (e) {}
+              try { mediaSource.endOfStream() } catch (e) { }
             } catch (e) {
               console.warn('MediaSource streaming failed', e)
-              try { mediaSource.endOfStream() } catch (ee) {}
+              try { mediaSource.endOfStream() } catch (ee) { }
             }
           })
 
           // cleanup handlers
           audioEl.addEventListener('ended', () => {
-            try { URL.revokeObjectURL(url) } catch (e) {}
+            try { URL.revokeObjectURL(url) } catch (e) { }
             setPlayingUrl(null)
             setPlayingText(null)
           })
@@ -384,7 +391,7 @@ export default function Dashboard() {
       a.play().finally(() => {
         // cleanup when finished
         a.addEventListener('ended', () => {
-          try { URL.revokeObjectURL(url) } catch (e) {}
+          try { URL.revokeObjectURL(url) } catch (e) { }
           setPlayingUrl(null)
           setPlayingText(null)
         })
@@ -398,8 +405,8 @@ export default function Dashboard() {
   }
 
   const stopAssistantAudio = () => {
-    try { audioRef.current?.pause?.(); } catch (e) {}
-    try { if (playingUrl) URL.revokeObjectURL(playingUrl) } catch (e) {}
+    try { audioRef.current?.pause?.(); } catch (e) { }
+    try { if (playingUrl) URL.revokeObjectURL(playingUrl) } catch (e) { }
     audioRef.current = null
     setPlayingUrl(null)
     setPlayingText(null)
@@ -459,7 +466,7 @@ export default function Dashboard() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <center>
-              <h2 className="text-lg font-semibold">Conversations</h2>
+                <h2 className="text-lg font-semibold">Conversations</h2>
               </center>
             </div>
 
@@ -567,7 +574,8 @@ export default function Dashboard() {
                     // set in-memory ref for immediate availability to chat sender
                     whiteboardImageRef.current = { id: selectedId, raw, contentType: contentType || 'image/png', dataUrl: imgData }
 
-                    setConversations((list) => list.map((c) => c.id === selectedId ? ({ ...c,
+                    setConversations((list) => list.map((c) => c.id === selectedId ? ({
+                      ...c,
                       whiteboardImage: imgData,
                       whiteboardImageBase64: raw,
                       whiteboardImageContentType: contentType || 'image/png'
@@ -588,7 +596,8 @@ export default function Dashboard() {
                       console.warn('could not parse whiteboard data URL on save', e)
                     }
                     whiteboardImageRef.current = { id: selectedId, raw, contentType: contentType || 'image/png', dataUrl: imgData }
-                    setConversations((list) => list.map((c) => c.id === selectedId ? ({ ...c,
+                    setConversations((list) => list.map((c) => c.id === selectedId ? ({
+                      ...c,
                       whiteboardImage: imgData,
                       whiteboardImageBase64: raw,
                       whiteboardImageContentType: contentType || 'image/png'
