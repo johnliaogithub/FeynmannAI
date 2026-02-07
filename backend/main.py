@@ -114,22 +114,6 @@ async def chat_with_image(
         if len(content) == 0:
             raise HTTPException(400, "Empty file received")
         
-        # --- Save image for debugging ---
-        try:
-            debug_dir = os.path.join(os.getcwd(), "debug_images")
-            os.makedirs(debug_dir, exist_ok=True)
-            # Determine extension from filename or content type
-            _, ext = os.path.splitext(file.filename or "")
-            if not ext:
-                ext = mimetypes.guess_extension(file.content_type) or ".img"
-            debug_filename = f"debug_{uuid.uuid4()}{ext}"
-            debug_path = os.path.join(debug_dir, debug_filename)
-            with open(debug_path, "wb") as dbg_f:
-                dbg_f.write(content)
-            print(f"Saved debug image to: {debug_path}")
-        except Exception as save_exc:
-            print(f"Failed to save debug image: {save_exc}")
-        
         # Determine media type
         media_type = file.content_type
         
