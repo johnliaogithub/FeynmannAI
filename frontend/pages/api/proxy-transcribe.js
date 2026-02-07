@@ -19,6 +19,14 @@ export default async function handler(req, res) {
 
     const headers = {}
     if (req.headers['content-type']) headers['content-type'] = req.headers['content-type']
+    // set content-length when forwarding
+    headers['content-length'] = buffer.length
+
+    console.log('proxy-transcribe: forwarding upload', {
+      backend,
+      incomingSize: buffer.length,
+      incomingContentType: req.headers['content-type'],
+    })
 
     const backendRes = await fetch(`${backend}/transcribe-audio/`, {
       method: 'POST',
@@ -27,6 +35,7 @@ export default async function handler(req, res) {
     })
 
     const text = await backendRes.text()
+    console.log('proxy-transcribe: backend response', { status: backendRes.status, ct: backendRes.headers.get('content-type') })
     res.status(backendRes.status)
     const ct = backendRes.headers.get('content-type')
     if (ct) res.setHeader('content-type', ct)

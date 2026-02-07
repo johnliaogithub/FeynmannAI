@@ -2,6 +2,7 @@ import os
 import shutil
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Form
 import base64
+import mimetypes
 from langchain_core.messages import HumanMessage
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -112,6 +113,21 @@ async def chat_with_image(
         content = await file.read()
         if len(content) == 0:
             raise HTTPException(400, "Empty file received")
+            # --- Save image for debugging ---
+            try:
+                debug_dir = os.path.join(os.getcwd(), "debug_images")
+                os.makedirs(debug_dir, exist_ok=True)
+                # Determine extension from filename or content type
+                _, ext = os.path.splitext(file.filename or "")
+                if not ext:
+                    ext = mimetypes.guess_extension(file.content_type) or ".img"
+                debug_filename = f"debug_{uuid.uuid4()}{ext}"
+                debug_path = os.path.join(debug_dir, debug_filename)
+                with open(debug_path, "wb") as dbg_f:
+                    dbg_f.write(content)
+                print(f"Saved debug image to: {debug_path}")
+            except Exception as save_exc:
+                print(f"Failed to save debug image: {save_exc}")
         
         # Determine media type
         media_type = file.content_type

@@ -49,8 +49,8 @@ export default function Auth({ onUser, redirectTo = '/dashboard' }) {
         setUser(u)
         onUser && onUser(u)
         setInitializing(false)
-        if (u) {
-          try { router.replace('/dashboard') } catch (e) {}
+        if (u && redirectTo) {
+          try { router.replace(redirectTo) } catch (e) {}
         }
       })
     })
@@ -72,7 +72,7 @@ export default function Auth({ onUser, redirectTo = '/dashboard' }) {
       setError(null)
       // Start OAuth and request Supabase redirect back to the chosen path.
       // Redirect to our server callback which will perform the token exchange
-      const callbackUrl = typeof window !== 'undefined'
+      const callbackUrl = typeof window !== 'undefined' && redirectTo
         ? window.location.origin + `/api/auth/callback?redirect_to=${encodeURIComponent(redirectTo)}`
         : undefined
       await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: callbackUrl } })
@@ -87,7 +87,7 @@ export default function Auth({ onUser, redirectTo = '/dashboard' }) {
       setError(null)
       setMagicMsg(null)
       if (!email) return setError('Enter an email address')
-      const redirectUrl = typeof window !== 'undefined' ? window.location.origin + redirectTo : undefined
+      const redirectUrl = typeof window !== 'undefined' && redirectTo ? window.location.origin + redirectTo : undefined
       const { data, error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectUrl } })
       if (error) throw error
       setMagicMsg('Magic link sent to ' + email + '. Check your inbox.')
@@ -106,7 +106,7 @@ export default function Auth({ onUser, redirectTo = '/dashboard' }) {
     setUser(demo)
     onUser && onUser(demo)
     try { window.localStorage.setItem('demo_user', JSON.stringify(demo)) } catch (e) {}
-    try { const redirectUrl = typeof window !== 'undefined' ? window.location.origin + redirectTo : '/' ; window.location.replace(redirectUrl) } catch (e) {}
+    try { const redirectUrl = typeof window !== 'undefined' && redirectTo ? window.location.origin + redirectTo : '/' ; window.location.replace(redirectUrl) } catch (e) {}
   }
 
   if (initializing) return <div>Loading…</div>
