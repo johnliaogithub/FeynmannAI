@@ -72,8 +72,8 @@ export default function Auth({ onUser, redirectTo = '/dashboard' }) {
       setError(null)
       // Start OAuth and request Supabase redirect back to the chosen path.
       // Redirect to our server callback which will perform the token exchange
-      const callbackUrl = typeof window !== 'undefined' && redirectTo
-        ? window.location.origin + `/api/auth/callback?redirect_to=${encodeURIComponent(redirectTo)}`
+      const callbackUrl = typeof window !== 'undefined'
+        ? window.location.origin + `/api/auth/callback${redirectTo ? `?redirect_to=${encodeURIComponent(redirectTo)}` : ''}`
         : undefined
       console.log('Initiating OAuth with callbackUrl:', callbackUrl)
       await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: callbackUrl } })
