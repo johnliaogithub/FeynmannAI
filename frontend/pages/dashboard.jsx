@@ -502,6 +502,27 @@ export default function Dashboard() {
                     }) : c))
                   }
                 }}
+                onSave={(imgData) => {
+                  if (imgData && selectedId) {
+                    let raw = imgData
+                    let contentType = null
+                    try {
+                      const m = imgData.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/)
+                      if (m) {
+                        contentType = m[1]
+                        raw = m[2]
+                      }
+                    } catch (e) {
+                      console.warn('could not parse whiteboard data URL on save', e)
+                    }
+                    whiteboardImageRef.current = { id: selectedId, raw, contentType: contentType || 'image/png', dataUrl: imgData }
+                    setConversations((list) => list.map((c) => c.id === selectedId ? ({ ...c,
+                      whiteboardImage: imgData,
+                      whiteboardImageBase64: raw,
+                      whiteboardImageContentType: contentType || 'image/png'
+                    }) : c))
+                  }
+                }}
               />
             )}
           </div>
