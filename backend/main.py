@@ -130,7 +130,7 @@ async def speak_text(request: SpeakRequest, background_tasks: BackgroundTasks ):
     output_filename = f"tts_{uuid.uuid4()}.mp3"
     try:
         # Call ElevenLabs TTS
-        audio_stream = client.text_to_speech.convert(
+        audio_stream = client_eleven.text_to_speech.convert(
             voice_id="vDchjyOZZytffNeZXfZK",  # or any voice you like
             model_id="eleven_monolingual_v1",
             text=request.text
