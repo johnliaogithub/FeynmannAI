@@ -83,8 +83,11 @@ export default async function handler(req, res) {
     const hash = `#access_token=${encodeURIComponent(data.access_token || '')}&refresh_token=${encodeURIComponent(data.refresh_token || '')}&expires_in=${encodeURIComponent(data.expires_in || '')}`
     // Determine the base URL from the request headers if the env var is not set
     const protocol = req.headers['x-forwarded-proto'] || 'http'
-    const host = req.headers['x-forwarded-host'] || req.headers.host
+    const rawHost = req.headers['x-forwarded-host'] || req.headers.host
+    const host = Array.isArray(rawHost) ? rawHost[0] : rawHost
     const defaultUrl = host ? `${protocol}://${host}` : null
+
+    console.log('PKCE Flow Debug:', { headers: req.headers, host, defaultUrl, envUrl: process.env.NEXT_PUBLIC_APP_URL })
 
     const redirectTo = `${defaultUrl || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}${clientRedirect}${hash}`
 
