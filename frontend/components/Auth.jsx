@@ -38,7 +38,7 @@ export default function Auth({ onUser, redirectTo = '/dashboard' }) {
       try {
         const cleaned = window.location.origin + window.location.pathname
         window.history.replaceState({}, document.title, cleaned)
-      } catch (e) {}
+      } catch (e) { }
     }
 
     // Attempt to restore session from URL hash, then load current session.
@@ -50,7 +50,7 @@ export default function Auth({ onUser, redirectTo = '/dashboard' }) {
         onUser && onUser(u)
         setInitializing(false)
         if (u && redirectTo) {
-          try { router.replace(redirectTo) } catch (e) {}
+          try { router.replace(redirectTo) } catch (e) { }
         }
       })
     })
@@ -75,6 +75,7 @@ export default function Auth({ onUser, redirectTo = '/dashboard' }) {
       const callbackUrl = typeof window !== 'undefined' && redirectTo
         ? window.location.origin + `/api/auth/callback?redirect_to=${encodeURIComponent(redirectTo)}`
         : undefined
+      console.log('Initiating OAuth with callbackUrl:', callbackUrl)
       await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: callbackUrl } })
     } catch (e) {
       console.error('Sign-in error', e)
@@ -105,8 +106,8 @@ export default function Auth({ onUser, redirectTo = '/dashboard' }) {
     const demo = { id: 'dev', email: 'dev@local', user_metadata: { full_name: 'Demo User' } }
     setUser(demo)
     onUser && onUser(demo)
-    try { window.localStorage.setItem('demo_user', JSON.stringify(demo)) } catch (e) {}
-    try { const redirectUrl = typeof window !== 'undefined' && redirectTo ? window.location.origin + redirectTo : '/' ; window.location.replace(redirectUrl) } catch (e) {}
+    try { window.localStorage.setItem('demo_user', JSON.stringify(demo)) } catch (e) { }
+    try { const redirectUrl = typeof window !== 'undefined' && redirectTo ? window.location.origin + redirectTo : '/'; window.location.replace(redirectUrl) } catch (e) { }
   }
 
   if (initializing) return <div>Loading…</div>

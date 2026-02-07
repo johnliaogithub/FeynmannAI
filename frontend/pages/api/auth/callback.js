@@ -22,6 +22,7 @@ export default async function handler(req, res) {
 
     // Prioritize the URL from headers so Vercel previews work even if NEXT_PUBLIC_APP_URL is set to localhost
     const appUrl = (defaultUrl || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '')
+    console.log('Auth callback debug:', { headers: req.headers, defaultUrl, appUrl, envUrl: process.env.NEXT_PUBLIC_APP_URL })
     const forwardUrl = `${appUrl}${clientRedirectFallback}`
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Auth callback</title></head><body>
     <p>Processing sign-in… If you are not redirected, <a id="link" href="${forwardUrl}">continue</a>.</p>
