@@ -44,7 +44,7 @@ export default function Welcome() {
 
             <div className="p-4 bg-white dark:bg-slate-900 rounded shadow">
               <h3 className="font-semibold">Jonathan Xiao</h3>
-              <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">Bio or role — add details later.</p>
+              <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">Worked on the frontend and APIs.</p>
             </div>
           </div>
 
