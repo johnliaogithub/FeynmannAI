@@ -1,11 +1,13 @@
 import os
 import shutil
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse
 from elevenlabs.client import ElevenLabs
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
 from pydantic import BaseModel
+import uuid
 
 # Load API Key
 load_dotenv()
@@ -17,6 +19,9 @@ client = ElevenLabs(api_key=api_key)
 llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=google_api_key)
 
 class ChatRequest(BaseModel):
+    text: str
+
+class SpeakRequest(BaseModel):
     text: str
 
 # Prompt Template for Feynman Student
@@ -81,3 +86,33 @@ async def transcribe_audio(file: UploadFile = File(...)):
     finally:
         if os.path.exists(temp_filename):
             os.remove(temp_filename)
+
+@app.post("/speak/")
+async def speak_text(request: SpeakRequest, background_tasks: BackgroundTasks ):
+    if not request.text.strip():
+        raise HTTPException(status_code=400, detail="Text cannot be empty.")
+    output_filename = f"tts_{uuid.uuid4()}.mp3"
+    try:
+        # Call ElevenLabs TTS
+        audio_stream = client.text_to_speech.convert(
+            voice_id="vDchjyOZZytffNeZXfZK",  # or any voice you like
+            model_id="eleven_monolingual_v1",
+            text=request.text
+        )
+        # Save audio file
+        with open(output_filename, "wb") as f:
+            for chunk in audio_stream:
+                f.write(chunk)
+       
+        # Schedule cleanup AFTER response is sent
+        background_tasks.add_task(os.remove, output_filename)
+
+        # Return audio file
+        return FileResponse(
+            output_filename,
+            media_type="audio/mpeg",
+            filename="response.mp3"
+        )
+    except Exception as e:
+        print(f"Server Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
