@@ -5,11 +5,9 @@ export default async function handler(req, res) {
     return res.status(405).end('Method Not Allowed')
   }
 
-  const backend = process.env.TRANSCRIBE_BACKEND_URL || 'http://127.0.0.1:8000'
+  const backend = (process.env.TRANSCRIBE_BACKEND_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
   try {
-    const targetUrl = `${backend}/chat/`
-    console.log('Proxying chat request to:', targetUrl)
-    const backendRes = await fetch(targetUrl, {
+    const backendRes = await fetch(`${backend}/chat/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req.body),
