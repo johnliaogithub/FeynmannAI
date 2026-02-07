@@ -1,52 +1,42 @@
-html,body,#__next{height:100%}
-body{margin:0;color:#111}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-button{cursor:pointer}
-
-/* Dashboard styles */
-.dashboard {
-	padding: 24px;
-	font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
-	color: #0f172a;
-	background: linear-gradient(180deg,#f8fafc 0%, #ffffff 100%);
-	min-height: 100vh;
-}
-.topbar { display:flex; justify-content:space-between; align-items:center; gap:12px }
-.userBadge { display:flex; align-items:center; gap:12px }
-.userBadge strong { font-weight:600 }
-
-.controls { display:flex; gap:8px; align-items:center }
-.controls select { padding:8px 10px; border-radius:8px; border:1px solid #e6e9ee; background:white }
-.controls button { padding:8px 12px; border-radius:8px; border:1px solid transparent; background:#0ea5a3; color:white }
-.controls button.secondary { background:#eef2ff; color:#3730a3; border-color:#e0e7ff }
-.controls button.danger { background:#fecaca; color:#7f1d1d }
-
-.panel { margin-top:20px; background:linear-gradient(180deg,#ffffff,#fbfdff); padding:16px; border-radius:12px; box-shadow:0 6px 18px rgba(12,20,48,0.06) }
-.conversation { max-width:800px }
-.message { padding:8px 10px; border-radius:8px; margin-bottom:8px }
-.message.user { background:#eef2ff; color:#0f172a }
-.message.assistant { background:#f1f5f9; color:#0f172a }
-
-@media (max-width:640px) {
-	.controls { flex-wrap:wrap }
-	.controls select { flex:1 }
+@layer base {
+	html,body,#__next{height:100%}
+	body{margin:0;color:#111}
 }
 
-/* Landing / Index styles */
-.container { max-width: 960px; margin: 0 auto; padding: 48px 20px }
-.hero { display:flex; gap:24px; align-items:center; justify-content:space-between }
-.heroInner { flex:1 }
-.title { font-size:32px; font-weight:700; margin:0 0 8px; color:#0f172a }
-.tagline { margin:0 0 16px; color:#475569 }
-.cta { display:flex; gap:12px; align-items:center }
-.cta .primary { background:#0ea5a3; color:white; padding:12px 18px; border-radius:10px; border:0 }
-.cta .secondary { background:transparent; color:#0f172a; padding:10px 14px; border-radius:10px; border:1px solid rgba(15,23,42,0.06) }
-.heroGraphic { width:220px; height:220px; border-radius:16px; background:linear-gradient(180deg,#eef2ff,#f8fafc); display:flex; align-items:center; justify-content:center; box-shadow:0 10px 30px rgba(12,20,48,0.06) }
-.features { display:flex; gap:12px; margin-top:28px }
-.feature { flex:1; padding:12px; background:white; border-radius:10px; box-shadow:0 6px 18px rgba(12,20,48,0.04) }
+@layer components {
+	.dashboard { @apply p-6 font-sans text-slate-900 bg-gradient-to-b from-slate-50 to-white min-h-screen }
+	.topbar { @apply flex justify-between items-center gap-3 }
+	.userBadge { @apply flex items-center gap-3 }
+	.controls { @apply flex gap-2 items-center }
+	.controls select { @apply px-3 py-2 rounded-md border bg-white }
+	.controls button { @apply px-3 py-2 rounded-md bg-primary text-white }
+	.controls .secondary { @apply bg-slate-100 text-slate-800 border }
+	.controls .danger { @apply bg-rose-200 text-rose-800 }
+	.panel { @apply mt-5 bg-white p-4 rounded-xl shadow-md }
+	.conversation { @apply max-w-3xl }
+	.message { @apply px-3 py-2 rounded-md mb-2 }
+	.message.user { @apply bg-sky-100 }
+	.message.assistant { @apply bg-slate-100 }
 
-@media (max-width:880px) {
-	.hero { flex-direction:column; align-items:flex-start }
-	.heroGraphic { width:100%; height:160px }
-	.features { flex-direction:column }
+	.container { @apply max-w-4xl mx-auto px-5 py-12 }
+	.hero { @apply flex gap-6 items-center justify-between }
+	.heroInner { @apply flex-1 }
+	.title { @apply text-3xl font-extrabold text-slate-900 }
+	.tagline { @apply text-slate-600 mt-2 }
+	.cta { @apply flex gap-3 items-center mt-4 }
+	.cta .primary { @apply bg-primary text-white px-4 py-2 rounded-lg shadow-sm }
+	.cta .secondary { @apply bg-transparent text-slate-900 px-3 py-2 rounded-lg border }
+	.heroGraphic { @apply w-56 h-56 rounded-xl bg-gradient-to-b from-sky-50 to-white flex items-center justify-center shadow-lg }
+	.features { @apply flex gap-3 mt-7 }
+	.feature { @apply flex-1 p-3 bg-white rounded-lg shadow-sm }
+}
+
+@layer utilities {
+	@screen sm {
+		.controls { @apply flex-wrap }
+	}
 }

@@ -1,16 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
 import supabase from '../lib/supabaseClient'
 const Auth = dynamic(() => import('../components/Auth'), { ssr: false })
 
 const VoiceTutor = dynamic(() => import('../components/VoiceTutor'), { ssr: false })
+const RecorderUpload = dynamic(() => import('../components/RecorderUpload'), { ssr: false })
 
 export default function Dashboard() {
   const [user, setUser] = useState(null)
   const [conversations, setConversations] = useState([]) // [{id,title,messages,createdAt}]
   const [selectedId, setSelectedId] = useState(null)
   const [initializing, setInitializing] = useState(true)
+  const messagesRef = useRef(null)
   const router = useRouter()
 
   // Load session and conversation for this user
@@ -69,9 +71,61 @@ export default function Dashboard() {
     } catch (e) {}
   }, [conversations, selectedId, user])
 
+  // auto-scroll messages container to bottom on new messages / selection change (smooth)
+  useEffect(() => {
+    try {
+      const el = messagesRef.current
+      if (!el) return
+      // smooth scroll to bottom
+      if ('scrollTo' in el) {
+        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+      } else {
+        el.scrollTop = el.scrollHeight
+      }
+    } catch (e) {}
+  }, [conversations, selectedId])
+
   const handleTranscript = (text) => {
     const entry = { role: 'user', text }
     setConversations((list) => list.map((c) => c.id === selectedId ? { ...c, messages: [...c.messages, entry] } : c))
+  }
+
+  // send transcript to backend chat endpoint and append Gemini reply
+  const handleTranscriptAndChat = async (text) => {
+    if (!text) return
+    const userEntry = { role: 'user', text }
+    const pendingAssistant = { role: 'assistant', text: 'Thinking...', _pending: true }
+    setConversations((list) => list.map((c) => c.id === selectedId ? { ...c, messages: [...c.messages, userEntry, pendingAssistant] } : c))
+
+    try {
+      const res = await fetch('/api/proxy-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      })
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '')
+        throw new Error(`Server ${res.status}: ${txt}`)
+      }
+      const data = await res.json().catch(() => ({}))
+      const reply = data?.response || data?.transcription || data?.text || ''
+      const final = reply && reply.trim() ? reply : '[no reply]'
+
+      // replace the pending assistant message with final reply
+      setConversations((list) => list.map((c) => {
+        if (c.id !== selectedId) return c
+        const msgs = c.messages.map((m) => m._pending ? ({ role: 'assistant', text: final }) : m)
+        return { ...c, messages: msgs }
+      }))
+    } catch (e) {
+      console.error('Chat error', e)
+      const errText = `Error: ${e.message || 'chat failed'}`
+      setConversations((list) => list.map((c) => {
+        if (c.id !== selectedId) return c
+        const msgs = c.messages.map((m) => m._pending ? ({ role: 'assistant', text: errText }) : m)
+        return { ...c, messages: msgs }
+      }))
+    }
   }
 
   const getSelectedConversation = () => conversations.find((c) => c.id === selectedId) || null
@@ -122,43 +176,77 @@ export default function Dashboard() {
   }
 
   return (
-    <main className="dashboard">
-      <div className="topbar">
-        <h1>Dashboard</h1>
-        <div className="userBadge">
-          <strong>{user.user_metadata?.full_name || user.email}</strong>
-          <button onClick={signOut} className="secondary">Sign out</button>
-        </div>
-      </div>
-
-      <p style={{ marginTop: 8 }}>This is your personal workspace. Conversation is stored locally per account for now.</p>
-
-      <section className="panel">
-        <div className="controls">
-          <label style={{ marginRight: 8 }}>Conversation</label>
-          <select value={selectedId || ''} onChange={(e) => setSelectedId(e.target.value)}>
-            {conversations.map((c) => (
-              <option key={c.id} value={c.id}>{c.title}</option>
-            ))}
-          </select>
-          <button onClick={() => createConversation()}>New</button>
-          <button onClick={() => renameConversation(selectedId)} className="secondary" disabled={!selectedId}>Rename</button>
-          <button onClick={() => deleteConversation(selectedId)} className="danger" disabled={!selectedId}>Delete</button>
-        </div>
-
-        <div style={{ marginTop: 12 }}>
-          <VoiceTutor onTranscript={handleTranscript} />
-        </div>
-
-        <div style={{ marginTop: 20 }} className="conversation">
-          <h2>Conversation</h2>
+    <div className="min-h-screen bg-slate-900 text-slate-100">
+      <div className="flex">
+        {/* Sidebar */}
+        <aside className="w-72 bg-slate-800 border-r border-slate-700 min-h-screen p-4 flex flex-col">
           <div>
-            {getSelectedConversation()?.messages?.map((m, i) => (
-              <div key={i} className={`message ${m.role === 'user' ? 'user' : 'assistant'}`}><strong>{m.role}:</strong> {m.text}</div>
-            ))}
+            <div className="flex items-center justify-between mb-4">
+              <center>
+              <h2 className="text-lg font-semibold">Conversations</h2>
+              </center>
+            </div>
+
+            <div className="space-y-2">
+              {conversations.map((c) => (
+                <div key={c.id} onClick={() => setSelectedId(c.id)} className={`p-2 rounded-md cursor-pointer ${c.id === selectedId ? 'bg-slate-700 ring-2 ring-primary/40' : 'hover:bg-slate-700'}`}>
+                  <div className="flex justify-between items-center">
+                    <div className="truncate">{c.title}</div>
+                    <div className="text-xs text-slate-400">{c.messages.length}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6">
+              <button onClick={() => createConversation()} className="w-full px-3 py-2 rounded-md bg-primary text-slate-900 font-medium">New Conversation</button>
+            </div>
           </div>
-        </div>
-      </section>
-    </main>
+
+          <div className="mt-auto">
+            <button onClick={signOut} className="w-full px-3 py-2 rounded-md bg-slate-700 text-sm">Sign out</button>
+          </div>
+        </aside>
+
+        {/* Main chat area */}
+        <main className="flex-1 p-6">
+          <div className="max-w-4xl mx-auto">
+            <header className="flex items-center justify-between">
+              <h1 className="text-2xl font-bold">{getSelectedConversation()?.title || 'Conversation'}</h1>
+              <div className="flex items-center gap-2">
+                <button onClick={() => renameConversation(selectedId)} className="px-3 py-1 bg-slate-800 rounded-md text-sm" disabled={!selectedId}>Rename</button>
+                <button onClick={() => deleteConversation(selectedId)} className="px-3 py-1 bg-rose-600 rounded-md text-sm" disabled={!selectedId}>Delete</button>
+              </div>
+            </header>
+
+            <section className="mt-6 bg-slate-800 rounded-lg p-4 h-[640px]">
+              <div ref={messagesRef} className="h-full overflow-y-auto pr-2 flex flex-col gap-3">
+                {getSelectedConversation()?.messages?.map((m, i) => {
+                  const firstName = (user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'You')?.split?.(' ')[0] || 'You'
+                  const label = m.role === 'user' ? firstName : (m.role === 'assistant' ? 'Clueless Learner' : m.role)
+                  return (
+                    <div key={i} className={`p-3 rounded-md ${m.role === 'user' ? 'bg-slate-700 text-slate-100 self-end' : 'bg-slate-700/60 text-slate-200'}`}>
+                      <div className="text-sm"><strong>{label}</strong></div>
+                      <div className="mt-1">{m.text}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+
+            <footer className="mt-6">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <RecorderUpload endpoint="http://127.0.0.1:8000/transcribe-audio/" onTranscribed={(txt) => {
+                    // when a transcription arrives, append as user message and call backend chat
+                    handleTranscriptAndChat(txt)
+                  }} />
+                </div>
+              </div>
+            </footer>
+          </div>
+        </main>
+      </div>
+    </div>
   )
 }
