@@ -46,42 +46,63 @@ export default function Dashboard() {
       setUser(u)
       setInitializing(false)
       if (!u) return // wait for auth state change before redirecting
-
-      try {
-        // Migration: if old single-conversation key exists, migrate it
-        const oldRaw = localStorage.getItem(`conversation:${u.id}`)
-        const newRaw = localStorage.getItem(`conversations:${u.id}`)
-        if (!newRaw && oldRaw) {
-          const msgs = JSON.parse(oldRaw)
-          const conv = { id: `c-${Date.now()}`, title: 'Conversation 1', messages: msgs || [], createdAt: Date.now() }
-          localStorage.setItem(`conversations:${u.id}`, JSON.stringify([conv]))
-          localStorage.setItem(`conversations:selected:${u.id}`, conv.id)
-          setConversations([conv])
-          setSelectedId(conv.id)
-        } else if (newRaw) {
-          const arr = JSON.parse(newRaw)
-          setConversations(arr || [])
-          const sel = localStorage.getItem(`conversations:selected:${u.id}`) || (arr && arr[0]?.id) || null
-          setSelectedId(sel)
-        } else {
-          // no previous data: initialize an empty conversation list
-          const conv = { id: `c-${Date.now()}`, title: 'Conversation 1', messages: [], createdAt: Date.now() }
-          setConversations([conv])
-          setSelectedId(conv.id)
-        }
-      } catch (e) {
-        console.warn('Could not load conversations', e)
-      }
     }
     init()
+
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       const u = session?.user ?? null
       // if user signed out, go to home
       if (event === 'SIGNED_OUT') router.push('/')
       setUser(u)
     })
-    return () => { sub?.subscription?.unsubscribe?.(); mounted = false }
+
+    return () => {
+      mounted = false
+      sub?.subscription?.unsubscribe()
+    }
   }, [router])
+
+  // Load conversations when user changes
+  useEffect(() => {
+    if (!user) return
+    try {
+      // Migration: if old single-conversation key exists, migrate it
+      const oldRaw = localStorage.getItem(`conversation:${user.id}`)
+      let migrated = false
+      if (oldRaw) {
+        try {
+          const oldMessages = JSON.parse(oldRaw)
+          if (Array.isArray(oldMessages) && oldMessages.length > 0) {
+            const newConv = { id: `c-${Date.now()}`, title: 'Migrated Conversation', messages: oldMessages, createdAt: Date.now() }
+            localStorage.setItem(`conversations:${user.id}`, JSON.stringify([newConv]))
+            localStorage.removeItem(`conversation:${user.id}`) // clear old
+            localStorage.setItem(`conversations:selected:${user.id}`, newConv.id)
+            migrated = true
+          }
+        } catch (e) { }
+      }
+
+      const raw = localStorage.getItem(`conversations:${user.id}`)
+      let arr = []
+      if (raw) {
+        try { arr = JSON.parse(raw) } catch (e) { }
+      }
+
+      if (Array.isArray(arr) && arr.length > 0) {
+        setConversations(arr)
+        // restore selection or pick first
+        const sel = localStorage.getItem(`conversations:selected:${user.id}`) || arr[0]?.id || null
+        setSelectedId(sel)
+      } else {
+        // no previous data: initialize an empty conversation list
+        const conv = { id: `c-${Date.now()}`, title: 'Conversation 1', messages: [], createdAt: Date.now() }
+        setConversations([conv])
+        setSelectedId(conv.id)
+      }
+    } catch (e) {
+      console.error('Error loading conversations', e)
+    }
+  }, [user])
 
   // persist conversations + selected id
   useEffect(() => {
@@ -114,12 +135,10 @@ export default function Dashboard() {
   // send transcript to backend chat endpoint and append Gemini reply
   const handleTranscriptAndChat = async (text) => {
     if (!text) return
-    console.log('handleTranscriptAndChat starting', { text, selectedId })
     const userEntry = { role: 'user', text }
     const pendingAssistant = { role: 'assistant', text: 'Thinking...', _pending: true }
     // if a local placeholder exists as the last user message, replace it
     setConversations((list) => {
-      console.log('setConversations (pending update)', { selectedId, listLen: list.length })
       return list.map((c) => {
         if (c.id !== selectedId) return c
         const last = c.messages[c.messages.length - 1]
@@ -137,7 +156,7 @@ export default function Dashboard() {
       const conv = getSelectedConversation()
       const payload = { text }
       if (conv?.geminiSessionId) payload.session_id = conv.geminiSessionId
-      console.log('proxy /api/proxy-chat sending payload', payload)
+      // console.log('proxy /api/proxy-chat sending payload', payload)
       const controller = new AbortController()
       const timeoutMs = 25000
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
@@ -177,14 +196,11 @@ export default function Dashboard() {
 
       // replace the pending assistant message with final reply and save gemini session id if provided
       const sessionId = data?.session_id || data?.session || data?.gemini_session_id || data?.sessionId || null
-      setConversations((list) => {
-        console.log('setConversations (final update)', { selectedId, reply: final })
-        return list.map((c) => {
-          if (c.id !== selectedId) return c
-          const msgs = c.messages.map((m) => m._pending ? ({ role: 'assistant', text: final }) : m)
-          return { ...c, messages: msgs, geminiSessionId: sessionId || c.geminiSessionId }
-        })
-      })
+      setConversations((list) => list.map((c) => {
+        if (c.id !== selectedId) return c
+        const msgs = c.messages.map((m) => m._pending ? ({ role: 'assistant', text: final }) : m)
+        return { ...c, messages: msgs, geminiSessionId: sessionId || c.geminiSessionId }
+      }))
 
       // Auto-play assistant reply TTS
       try { playAssistantAudio(final) } catch (e) { console.warn('Auto-play failed', e) }
