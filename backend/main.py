@@ -1,12 +1,14 @@
 import os
 import shutil
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.middleware.cors import CORSMiddleware 
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from elevenlabs.client import ElevenLabs
 from backboard import BackboardClient
 from dotenv import load_dotenv
 from langchain_core.prompts import PromptTemplate
 from pydantic import BaseModel
+import uuid
 
 # 1. Load Keys
 load_dotenv()
@@ -18,7 +20,13 @@ assistant_id = os.getenv("BACKBOARD_ASSISTANT_ID")
 client_eleven = ElevenLabs(api_key=elevenlabs_api_key)
 client_backboard = BackboardClient(api_key=backboard_api_key)
 
-# 3. KEEP LANGCHAIN: Define your Prompt Template
+class ChatRequest(BaseModel):
+    text: str
+
+class SpeakRequest(BaseModel):
+    text: str
+
+# Prompt Template for Feynman Student
 template = """
 You are a student who is eager to learn but pretends to not know anything about the subject. 
 The user is teaching you a concept. 
@@ -114,3 +122,33 @@ async def transcribe_audio(file: UploadFile = File(...)):
     finally:
         if os.path.exists(temp_filename):
             os.remove(temp_filename)
+
+@app.post("/speak/")
+async def speak_text(request: SpeakRequest, background_tasks: BackgroundTasks ):
+    if not request.text.strip():
+        raise HTTPException(status_code=400, detail="Text cannot be empty.")
+    output_filename = f"tts_{uuid.uuid4()}.mp3"
+    try:
+        # Call ElevenLabs TTS
+        audio_stream = client_eleven.text_to_speech.convert(
+            voice_id="vDchjyOZZytffNeZXfZK",  # or any voice you like
+            model_id="eleven_monolingual_v1",
+            text=request.text
+        )
+        # Save audio file
+        with open(output_filename, "wb") as f:
+            for chunk in audio_stream:
+                f.write(chunk)
+       
+        # Schedule cleanup AFTER response is sent
+        background_tasks.add_task(os.remove, output_filename)
+
+        # Return audio file
+        return FileResponse(
+            output_filename,
+            media_type="audio/mpeg",
+            filename="response.mp3"
+        )
+    except Exception as e:
+        print(f"Server Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
