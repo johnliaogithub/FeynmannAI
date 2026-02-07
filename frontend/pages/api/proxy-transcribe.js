@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     return res.status(405).end('Method Not Allowed')
   }
 
-  const backend = process.env.TRANSCRIBE_BACKEND_URL || 'http://127.0.0.1:8000'
+  const backend = (process.env.TRANSCRIBE_BACKEND_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
   try {
     const chunks = []
     for await (const chunk of req) chunks.push(chunk)
