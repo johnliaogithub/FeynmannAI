@@ -481,9 +481,7 @@ export default function Dashboard() {
         <aside className="w-72 bg-slate-800 border-r border-slate-700 min-h-screen p-4 flex flex-col">
           <div>
             <div className="flex items-center justify-between mb-4">
-              <center>
-                <h2 className="text-lg font-semibold">Conversations</h2>
-              </center>
+              <h2 className="text-lg font-semibold">Conversations</h2>
             </div>
 
             <div className="space-y-2">
@@ -491,7 +489,23 @@ export default function Dashboard() {
                 <div key={c.id} onClick={() => setSelectedId(c.id)} className={`p-2 rounded-md cursor-pointer ${c.id === selectedId ? 'bg-slate-700 ring-2 ring-primary/40' : 'hover:bg-slate-700'}`}>
                   <div className="flex justify-between items-center">
                     <div className="truncate">{c.title}</div>
-                    <div className="text-xs text-slate-400">{c.messages.length}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-xs text-slate-400">{c.messages.length}</div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteConversation(c.id) }}
+                        aria-label={`Delete ${c.title}`}
+                        title="Delete"
+                        className="ml-1 p-1 rounded-md hover:bg-rose-700"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-rose-400">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                          <path d="M10 11v6" />
+                          <path d="M14 11v6" />
+                          <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -502,7 +516,9 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="mt-auto">
+          <div className="mt-auto space-y-2">
+            <button onClick={() => router.push('/')} className="w-full px-3 py-2 rounded-md bg-slate-700 text-sm">Home</button>
+            <button onClick={() => router.push('/welcome')} className="w-full px-3 py-2 rounded-md bg-slate-700 text-sm">About Us</button>
             <button onClick={signOut} className="w-full px-3 py-2 rounded-md bg-slate-700 text-sm">Sign out</button>
           </div>
         </aside>
@@ -511,10 +527,21 @@ export default function Dashboard() {
         <main className="flex-1 p-6">
           <div className="max-w-4xl mx-auto">
             <header className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold">{getSelectedConversation()?.title || 'Conversation'}</h1>
+              <div className="flex items-center">
+                <h1 className="text-2xl font-bold">{getSelectedConversation()?.title || 'Conversation'}</h1>
+                <button
+                  onClick={() => renameConversation(selectedId)}
+                  disabled={!selectedId}
+                  aria-label="Rename conversation"
+                  title="Rename"
+                  className={`ml-2 p-1 rounded-md hover:bg-slate-700 ${!selectedId ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-slate-200">
+                    <path d="M17 3l4 4L7 21H3v-4L17 3z" />
+                  </svg>
+                </button>
+              </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => router.push('/')} className="px-3 py-1 bg-slate-800 rounded-md text-sm">Home</button>
-                <button onClick={() => renameConversation(selectedId)} className="px-3 py-1 bg-slate-800 rounded-md text-sm" disabled={!selectedId}>Rename</button>
                 <button onClick={() => deleteConversation(selectedId)} className="px-3 py-1 bg-rose-600 rounded-md text-sm" disabled={!selectedId}>Delete</button>
                 <button onClick={() => setWhiteboardOpen(true)} className="px-3 py-1 bg-primary rounded-md text-slate-900 text-sm">Whiteboard</button>
               </div>
@@ -526,7 +553,7 @@ export default function Dashboard() {
                   const firstName = (user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'You')?.split?.(' ')[0] || 'You'
                   const label = m.role === 'user' ? firstName : (m.role === 'assistant' ? 'Clueless Learner' : m.role)
                   return (
-                    <div key={i} className={`p-3 rounded-md ${m.role === 'user' ? 'bg-slate-700 text-slate-100 self-end' : 'bg-slate-700/60 text-slate-200'}`}>
+                    <div key={i} className={`p-3 rounded-md bg-slate-700/60 text-slate-200` }>
                       <div className="flex items-center justify-between">
                         <div className="text-sm"><strong>{label}</strong></div>
                         {m.role === 'assistant' && (
@@ -537,7 +564,7 @@ export default function Dashboard() {
                               aria-label="Play assistant audio"
                               disabled={ttsLoadingText === m.text}
                             >
-                              {ttsLoadingText === m.text ? 'Loading…' : (playingText === m.text ? 'Playing…' : 'Play')}
+                              {ttsLoadingText === m.text ? 'Loading…' : (playingText === m.text ? 'Speaking…' : 'Speak')}
                             </button>
                             {playingText === m.text && (
                               <button
@@ -561,10 +588,14 @@ export default function Dashboard() {
             <footer className="mt-6">
               <div className="flex items-center gap-4">
                 <div className="flex-1">
-                  <RecorderUpload endpoint="/api/proxy-transcribe" onTranscribed={(txt) => {
-                    // Upload via same-origin proxy to avoid CORS and keep conversion
-                    handleTranscriptAndChat(txt)
-                  }} />
+                  <RecorderUpload
+                    endpoint="/api/proxy-transcribe"
+                    onTranscribed={(txt) => {
+                      // Upload via same-origin proxy to avoid CORS and keep conversion
+                      handleTranscriptAndChat(txt)
+                    }}
+                    onRecordingStart={() => { try { stopAssistantAudio() } catch (e) {} }}
+                  />
                 </div>
               </div>
             </footer>

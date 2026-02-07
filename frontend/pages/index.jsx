@@ -12,7 +12,7 @@ export default function Home() {
         <div className="flex items-center gap-4">
           <button onClick={() => router.push('/')} className="flex items-center gap-3">
             <div className="w-10 h-10 bg-primary rounded flex items-center justify-center text-black font-bold">F</div>
-            <span className="text-xl font-semibold">FeynmanAI</span>
+            <span className="text-xl font-semibold">FeynmannAI</span>
           </button>
         </div>
 
