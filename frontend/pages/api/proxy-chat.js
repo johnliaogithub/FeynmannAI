@@ -7,7 +7,9 @@ export default async function handler(req, res) {
 
   const backend = process.env.TRANSCRIBE_BACKEND_URL || 'http://127.0.0.1:8000'
   try {
-    const backendRes = await fetch(`${backend}/chat/`, {
+    const targetUrl = `${backend}/chat/`
+    console.log('Proxying chat request to:', targetUrl)
+    const backendRes = await fetch(targetUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req.body),

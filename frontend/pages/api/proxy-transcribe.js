@@ -28,7 +28,10 @@ export default async function handler(req, res) {
       incomingContentType: req.headers['content-type'],
     })
 
-    const backendRes = await fetch(`${backend}/transcribe-audio/`, {
+    const targetUrl = `${backend}/transcribe-audio/`
+    console.log('Proxying transcribe request to:', targetUrl)
+
+    const backendRes = await fetch(targetUrl, {
       method: 'POST',
       headers,
       body: buffer,
