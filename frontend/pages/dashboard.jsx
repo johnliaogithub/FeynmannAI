@@ -302,6 +302,78 @@ export default function Dashboard() {
         return
       }
 
+      // If the response is a streaming audio body and the browser supports MediaSource,
+      // stream chunks into a MediaSource for earlier playback start.
+      try {
+        const isMSESupported = typeof window !== 'undefined' && 'MediaSource' in window
+        if (isMSESupported && res.body) {
+          const mime = ct || 'audio/mpeg'
+          const mediaSource = new MediaSource()
+          const url = URL.createObjectURL(mediaSource)
+          setPlayingUrl(url)
+          setPlayingText(text)
+          const audioEl = new Audio()
+          audioRef.current = audioEl
+          audioEl.src = url
+          audioEl.autoplay = true
+
+          mediaSource.addEventListener('sourceopen', async () => {
+            try {
+              const sourceBuffer = mediaSource.addSourceBuffer(mime)
+              const reader = res.body.getReader()
+              const queue = []
+              let reading = true
+
+              const appendNext = () => {
+                if (queue.length === 0) return
+                if (sourceBuffer.updating) return
+                const chunk = queue.shift()
+                try { sourceBuffer.appendBuffer(chunk) } catch (e) { console.warn('appendBuffer failed', e) }
+              }
+
+              // start a small interval to attempt append when possible
+              const intId = setInterval(appendNext, 50)
+
+              while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                // value is a Uint8Array
+                queue.push(value)
+                appendNext()
+                // start playback once we have some data
+                if (audioEl.paused) {
+                  try { audioEl.play().catch(() => {}) } catch (e) {}
+                }
+              }
+
+              clearInterval(intId)
+              // wait for pending updates to finish
+              const waitForUpdate = () => new Promise((resolve) => {
+                if (!sourceBuffer.updating) return resolve()
+                const onUpd = () => { if (!sourceBuffer.updating) { sourceBuffer.removeEventListener('updateend', onUpd); resolve() } }
+                sourceBuffer.addEventListener('updateend', onUpd)
+              })
+              await waitForUpdate()
+              try { mediaSource.endOfStream() } catch (e) {}
+            } catch (e) {
+              console.warn('MediaSource streaming failed', e)
+              try { mediaSource.endOfStream() } catch (ee) {}
+            }
+          })
+
+          // cleanup handlers
+          audioEl.addEventListener('ended', () => {
+            try { URL.revokeObjectURL(url) } catch (e) {}
+            setPlayingUrl(null)
+            setPlayingText(null)
+          })
+          return
+        }
+      } catch (e) {
+        console.warn('Streaming attempt failed, falling back to full-buffer playback', e)
+      }
+
+      // Fallback: fully buffer then play
       const buf = await res.arrayBuffer()
       const blob = new Blob([buf], { type: ct })
       const url = URL.createObjectURL(blob)
