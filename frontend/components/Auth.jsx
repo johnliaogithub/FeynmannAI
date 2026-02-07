@@ -50,7 +50,10 @@ export default function Auth({ onUser, redirectTo = '/dashboard' }) {
         onUser && onUser(u)
         setInitializing(false)
         if (u && redirectTo) {
-          try { router.replace(redirectTo) } catch (e) { }
+          console.log('Auth component redirecting to:', redirectTo)
+          try { router.replace(redirectTo) } catch (e) {
+            console.error('Router replace error', e)
+          }
         }
       })
     })
