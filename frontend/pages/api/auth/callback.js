@@ -18,9 +18,10 @@ export default async function handler(req, res) {
     // Determine the base URL from the request headers if the env var is not set
     const protocol = req.headers['x-forwarded-proto'] || 'http'
     const host = req.headers['x-forwarded-host'] || req.headers.host
-    const defaultUrl = `${protocol}://${host}`
+    const defaultUrl = host ? `${protocol}://${host}` : null
 
-    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || defaultUrl).replace(/\/$/, '')
+    // Prioritize the URL from headers so Vercel previews work even if NEXT_PUBLIC_APP_URL is set to localhost
+    const appUrl = (defaultUrl || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '')
     const forwardUrl = `${appUrl}${clientRedirectFallback}`
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Auth callback</title></head><body>
     <p>Processing sign-in… If you are not redirected, <a id="link" href="${forwardUrl}">continue</a>.</p>
@@ -82,10 +83,10 @@ export default async function handler(req, res) {
     // Determine the base URL from the request headers if the env var is not set
     const protocol = req.headers['x-forwarded-proto'] || 'http'
     const host = req.headers['x-forwarded-host'] || req.headers.host
-    const defaultUrl = `${protocol}://${host}`
+    const defaultUrl = host ? `${protocol}://${host}` : null
 
-    const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL || defaultUrl}${clientRedirect}${hash}`
-    
+    const redirectTo = `${defaultUrl || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}${clientRedirect}${hash}`
+
     return res.redirect(redirectTo)
   } catch (e) {
     console.error('Exchange error', e)
