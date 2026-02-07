@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-export default function Whiteboard({ onClose, initialImage }) {
+export default function Whiteboard({ onClose, initialImage, onSave }) {
   const canvasRef = useRef(null)
   const containerRef = useRef(null)
   const [tool, setTool] = useState('pen') // 'pen' | 'eraser'
@@ -10,6 +10,8 @@ export default function Whiteboard({ onClose, initialImage }) {
   const historyRef = useRef([])
   const [historyLen, setHistoryLen] = useState(0)
   const MAX_HISTORY = 50
+  const savedDataUrlRef = useRef(initialImage || null)
+  const [isSaved, setIsSaved] = useState(Boolean(initialImage))
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -36,6 +38,9 @@ export default function Whiteboard({ onClose, initialImage }) {
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
             ctx.setTransform(1, 0, 0, 1, 0, 0)
             ctx.scale(dpr, dpr)
+            // mark the initial image as saved
+            try { savedDataUrlRef.current = initialImage } catch (e) {}
+            setIsSaved(true)
             pushHistory()
           }
           img.src = initialImage
@@ -61,6 +66,8 @@ export default function Whiteboard({ onClose, initialImage }) {
       h.push(data)
       if (h.length > MAX_HISTORY) h.shift()
       setHistoryLen(h.length)
+      // update saved state: compare current canvas data with last saved snapshot
+      try { setIsSaved(data === savedDataUrlRef.current) } catch (e) {}
     } catch (e) {
       console.warn('pushHistory failed', e)
     }
@@ -177,6 +184,33 @@ export default function Whiteboard({ onClose, initialImage }) {
     if (onClose) onClose()
   }
 
+  function handleSave() {
+    try {
+      const canvas = canvasRef.current
+      if (canvas && onSave) {
+        // Export with white background (same as close export)
+        const exportCanvas = document.createElement('canvas')
+        exportCanvas.width = canvas.width
+        exportCanvas.height = canvas.height
+        const exCtx = exportCanvas.getContext('2d')
+        exCtx.fillStyle = '#ffffff'
+        exCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height)
+        exCtx.drawImage(canvas, 0, 0)
+        const data = exportCanvas.toDataURL('image/png')
+        onSave(data)
+        // record history snapshot after saving
+        pushHistory()
+        // update saved snapshot
+        try { savedDataUrlRef.current = data } catch (e) {}
+        setIsSaved(true)
+        return
+      }
+    } catch (e) {
+      console.warn('whiteboard save failed', e)
+    }
+    if (onSave) onSave()
+  }
+
   return (
     <div ref={containerRef} className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={handleClose} />
@@ -193,6 +227,7 @@ export default function Whiteboard({ onClose, initialImage }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={handleSave} aria-label="Save" className="px-3 py-1 rounded bg-green-500 text-white">Save</button>
             <button onClick={handleClose} aria-label="Close" className="px-3 py-1 rounded bg-slate-300">X</button>
           </div>
         </div>
