@@ -25,6 +25,9 @@ export default async function handler(req, res) {
     const backendRes = await fetch(`${backend}/upload-notes/`, {
       method: 'POST',
       headers,
+      // Required in Node's fetch when streaming a request body.
+      // See: RequestInit.duplex in Node fetch implementations.
+      duplex: 'half',
       body: req,
     })
 
