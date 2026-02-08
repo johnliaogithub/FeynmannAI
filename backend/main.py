@@ -76,20 +76,6 @@ prompt_formatter = PromptTemplate(template=template, input_variables=["text"])
 
 app = FastAPI()
 
-# Simple request logging middleware to aid debugging incoming requests and 404s
-@app.middleware("http")
-async def log_requests(request, call_next):
-    try:
-        print(f"[backend] Incoming {request.method} {request.url}")
-    except Exception:
-        pass
-    response = await call_next(request)
-    try:
-        print(f"[backend] Responded {response.status_code} for {request.method} {request.url}")
-    except Exception:
-        pass
-    return response
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # "*" means allow ANY frontend (good for hackathons)

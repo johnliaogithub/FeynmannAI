@@ -12,21 +12,20 @@ export default async function handler(req, res) {
 
   const backend = (process.env.BACKEND_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
   try {
-    // Buffer the incoming request
-    const chunks = []
-    for await (const chunk of req) chunks.push(chunk)
-    const buffer = Buffer.concat(chunks)
-
+    // Stream the incoming request directly to the backend instead of
+    // buffering it in memory. This avoids Vercel function size limits
+    // and Content-Length header issues.
     const headers = {}
     if (req.headers['content-type']) headers['content-type'] = req.headers['content-type']
-    headers['content-length'] = buffer.length
 
-    console.log('proxy-upload: forwarding upload', { backend, size: buffer.length, contentType: req.headers['content-type'] })
+    console.log('proxy-upload: forwarding upload (streaming)', { backend, contentType: req.headers['content-type'] })
 
+    // Forward the Node.js IncomingMessage stream as the fetch body.
+    // Do NOT set `content-length` here; let the runtime use chunked transfer.
     const backendRes = await fetch(`${backend}/upload-notes/`, {
       method: 'POST',
       headers,
-      body: buffer,
+      body: req,
     })
 
     const ct = backendRes.headers.get('content-type') || ''
