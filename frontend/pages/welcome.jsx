@@ -59,7 +59,7 @@ export default function Welcome() {
 
             <div className="p-4 bg-white dark:bg-slate-900 rounded shadow flex flex-col items-center text-center">
               <h3 className="font-semibold">Julia Miao</h3>
-              <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">Bio or role — add details later.</p>
+              <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">Contributed to backend development.</p>
               <div className="mt-3">
                 <a
                   href="https://www.linkedin.com/in/julia-miao-116a0537a/"
