@@ -196,6 +196,24 @@ export default function Dashboard() {
           body: JSON.stringify(payload),
           signal: controller.signal,
         })
+
+        // If the image proxy isn't available on the host (404), fall back
+        // to the text-only chat proxy on the same origin so the user still
+        // receives a response without exposing local network addresses.
+        if (res.status === 404 && endpoint === '/api/proxy-chat-image') {
+          try {
+            const fbRes = await fetch('/api/proxy-chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text, session_id: payload.session_id }),
+              signal: controller.signal,
+            })
+            if (fbRes.ok) res = fbRes
+            else console.warn('Same-origin chat fallback failed', fbRes.status)
+          } catch (fbErr) {
+            console.warn('Same-origin chat fallback error', fbErr)
+          }
+        }
       } finally {
         clearTimeout(timeoutId)
       }
