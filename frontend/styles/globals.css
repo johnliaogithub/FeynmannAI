@@ -4,11 +4,11 @@
 
 @layer base {
 	html,body,#__next{height:100%}
-	body{margin:0;color:#111}
+	body{margin:0;color:#e6eef8;background:#0e1327}
 }
 
 @layer components {
-	.dashboard { @apply p-6 font-sans text-slate-900 bg-gradient-to-b from-slate-50 to-white min-h-screen }
+	.dashboard { @apply p-6 font-sans text-slate-100 min-h-screen }
 	.topbar { @apply flex justify-between items-center gap-3 }
 	.userBadge { @apply flex items-center gap-3 }
 	.controls { @apply flex gap-2 items-center }
@@ -16,7 +16,7 @@
 	.controls button { @apply px-3 py-2 rounded-md bg-primary text-white }
 	.controls .secondary { @apply bg-slate-100 text-slate-800 border }
 	.controls .danger { @apply bg-rose-200 text-rose-800 }
-	.panel { @apply mt-5 bg-white p-4 rounded-xl shadow-md }
+	.panel { @apply mt-5 bg-slate-800 p-4 rounded-xl shadow-md }
 	.conversation { @apply max-w-3xl }
 	.message { @apply px-3 py-2 rounded-md mb-2 }
 	.message.user { @apply bg-sky-100 }
@@ -30,9 +30,9 @@
 	.cta { @apply flex gap-3 items-center mt-4 }
 	.cta .primary { @apply bg-primary text-white px-4 py-2 rounded-lg shadow-sm }
 	.cta .secondary { @apply bg-transparent text-slate-900 px-3 py-2 rounded-lg border }
-	.heroGraphic { @apply w-56 h-56 rounded-xl bg-gradient-to-b from-sky-50 to-white flex items-center justify-center shadow-lg }
+	.heroGraphic { @apply w-56 h-56 rounded-xl bg-slate-800 flex items-center justify-center shadow-lg }
 	.features { @apply flex gap-3 mt-7 }
-	.feature { @apply flex-1 p-3 bg-white rounded-lg shadow-sm }
+	.feature { @apply flex-1 p-3 bg-slate-800 rounded-lg shadow-sm }
 }
 
 @layer utilities {

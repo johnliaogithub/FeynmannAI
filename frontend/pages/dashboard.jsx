@@ -524,11 +524,17 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100">
+    <div className="min-h-screen bg-[#0e1327] text-slate-100">
       <div className="flex">
         {/* Sidebar */}
         <aside className="w-72 bg-slate-800 border-r border-slate-700 min-h-screen p-4 flex flex-col">
           <div>
+            <div className="flex items-center gap-3 mb-4">
+              <button onClick={() => router.push('/')} className="flex items-center gap-3">
+                <img src="/image.png" alt="FeynmannAI" className="w-8 h-8 object-contain" />
+                <span className="text-lg font-semibold">FeynmannAI</span>
+              </button>
+            </div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Conversations</h2>
             </div>

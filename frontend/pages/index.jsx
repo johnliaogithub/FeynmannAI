@@ -7,11 +7,11 @@ export default function Home() {
   const router = useRouter()
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+    <div className="min-h-screen bg-[#0e1327] text-slate-100">
       <header className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button onClick={() => router.push('/')} className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary rounded flex items-center justify-center text-black font-bold">F</div>
+            <img src="/image.png" alt="FeynmannAI" className="w-12 h-12 object-contain" />
             <span className="text-xl font-semibold">FeynmannAI</span>
           </button>
         </div>
@@ -25,7 +25,7 @@ export default function Home() {
 
       <main className="max-w-4xl mx-auto px-6 py-32 flex flex-col items-center text-center">
         <div className="mb-8">
-          <div className="w-32 h-32 bg-primary rounded-full flex items-center justify-center text-black text-3xl font-bold">F</div>
+          <img src="/image.png" alt="FeynmannAI" className="w-44 h-44 object-contain mx-auto" />
         </div>
 
         <h1 className="text-5xl font-extrabold mb-4">Practice explaining ideas aloud</h1>
