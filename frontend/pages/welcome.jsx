@@ -29,7 +29,7 @@ export default function Welcome() {
           <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-4 bg-white dark:bg-slate-900 rounded shadow flex flex-col items-center text-center">
               <h3 className="font-semibold">John Liao</h3>
-              <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">Team Lead. Worked on frontend and backend. </p>
+              <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">Team Lead. Frontend and backend dev. </p>
               <div className="mt-3">
                 <a
                   href="https://www.linkedin.com/in/john-liao-1b8452317/"
