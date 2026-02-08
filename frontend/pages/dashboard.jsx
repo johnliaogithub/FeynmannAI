@@ -196,29 +196,6 @@ export default function Dashboard() {
           body: JSON.stringify(payload),
           signal: controller.signal,
         })
-
-        // If the proxy endpoint is not found (404) — e.g., missing on deployed host —
-        // fall back to calling the backend `/chat/` endpoint directly (without image)
-        if (res.status === 404) {
-          try {
-            const backend = (process.env.NEXT_PUBLIC_TRANSCRIBE_BACKEND_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
-            // fallback: call backend chat endpoint (no image support in fallback)
-            const fbRes = await fetch(`${backend}/chat/`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text }),
-              signal: controller.signal,
-            })
-            if (fbRes.ok) {
-              res = fbRes
-            } else {
-              // preserve original 404 if backend fallback also fails
-              console.warn('Backend fallback failed', fbRes.status)
-            }
-          } catch (fbErr) {
-            console.warn('Backend fallback error', fbErr)
-          }
-        }
       } finally {
         clearTimeout(timeoutId)
       }
