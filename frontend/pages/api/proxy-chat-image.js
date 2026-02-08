@@ -5,7 +5,7 @@ export default async function handler(req, res) {
     return res.status(405).end('Method Not Allowed')
   }
 
-  const backend = process.env.TRANSCRIBE_BACKEND_URL || 'http://127.0.0.1:8000'
+  const backend = (process.env.TRANSCRIBE_BACKEND_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
   try {
     // Build multipart/form-data expected by the backend: fields `text`, optional `session_id`, and `file` upload
     const body = req.body || {}
@@ -23,8 +23,9 @@ export default async function handler(req, res) {
       form.append('file', blob, 'whiteboard.png')
     }
 
-    console.log('proxy-chat-image: forwarding to backend', backend, 'body keys:', Object.keys(body || {}))
-    const backendRes = await fetch(`${backend}/chat-with-image/`, {
+    const forwardUrl = `${backend}/chat-with-image/`
+    console.log('proxy-chat-image: forwarding to backend', backend, 'forwardUrl:', forwardUrl, 'body keys:', Object.keys(body || {}))
+    const backendRes = await fetch(forwardUrl, {
       method: 'POST',
       body: form,
       // NOTE: do NOT set Content-Type header; fetch will set multipart boundary
