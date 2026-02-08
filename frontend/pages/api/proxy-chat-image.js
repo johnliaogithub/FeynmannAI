@@ -23,6 +23,7 @@ export default async function handler(req, res) {
       form.append('file', blob, 'whiteboard.png')
     }
 
+    console.log('proxy-chat-image: forwarding to backend', backend, 'body keys:', Object.keys(body || {}))
     const backendRes = await fetch(`${backend}/chat-with-image/`, {
       method: 'POST',
       body: form,
@@ -30,14 +31,22 @@ export default async function handler(req, res) {
     })
 
     const ct = backendRes.headers.get('content-type') || ''
-    res.status(backendRes.status)
+    const status = backendRes.status
+    const text = await backendRes.text().catch(() => '')
+    console.log('proxy-chat-image: backend response', { status, ct, bodyPreview: text && text.slice(0, 400) })
 
+    res.status(status)
     if (ct.includes('application/json')) {
-      const json = await backendRes.json()
-      res.setHeader('content-type', 'application/json')
-      return res.json(json)
+      try {
+        const json = JSON.parse(text)
+        res.setHeader('content-type', 'application/json')
+        return res.json(json)
+      } catch (e) {
+        console.warn('proxy-chat-image: failed to parse backend JSON', e)
+        if (ct) res.setHeader('content-type', ct)
+        return res.send(text)
+      }
     } else {
-      const text = await backendRes.text()
       if (ct) res.setHeader('content-type', ct)
       return res.send(text)
     }
