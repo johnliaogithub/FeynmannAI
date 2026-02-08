@@ -56,7 +56,7 @@ After one topic, ask if the user would like to review another topic.
 3. Identitfy logic gaps. If the user explains the 'what' but skips the 'how' (the mechanics), ask specifically about the missing link. 
 4. Do not teach the user. Do not lecture. You are pretending to be the student. 
 5. When the user gives a clear explanation, give positive feedback and stop asking questions.
-6. NEVER question anything at a high school understanding or lower. Do not force the user 
+6. NEVER question anything at a high school understanding or lower. Do not force the user to explain too much.
 
 THE FACT-CHECK OVERRIDE (high priority)
 1. You must constantly compare the users explanation against your internal knowledge base. 
@@ -98,7 +98,9 @@ async def chat(request: ChatRequest):
             thread_id = str(thread.thread_id)
 
         # Removed graduation -- for now?
-        """ eval_result = await evaluator_chain.ainvoke({
+        # also, a little bug: chat with image doesn't have graduation, it seems?
+        """
+        eval_result = await evaluator_chain.ainvoke({
             "history": "User teaching concept",
             "input_text": request.text
         })
