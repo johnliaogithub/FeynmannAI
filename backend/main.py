@@ -97,7 +97,8 @@ async def chat(request: ChatRequest):
             thread = await client_backboard.create_thread(assistant_id=assistant_id)
             thread_id = str(thread.thread_id)
 
-        eval_result = await evaluator_chain.ainvoke({
+        # Removed graduation -- for now?
+        """ eval_result = await evaluator_chain.ainvoke({
             "history": "User teaching concept",
             "input_text": request.text
         })
@@ -116,6 +117,7 @@ async def chat(request: ChatRequest):
                 "status": "GRADUATED",
                 "score": eval_result.score
             }
+        """
 
         formatted_prompt = prompt_formatter.format(text=request.text)
 
@@ -128,7 +130,7 @@ async def chat(request: ChatRequest):
             "response": response.content,
             "session_id": thread_id,
             "status": "CONTINUE",
-            "score": eval_result.score
+            "score": None
         }
 
     except Exception as e:
