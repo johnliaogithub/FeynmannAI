@@ -1,4 +1,4 @@
-# FeynmannAI
+# [FeynmannAI](https://feynmann-ai.vercel.app/)
 
 **Master complex topics by teaching them to an AI.**
 
