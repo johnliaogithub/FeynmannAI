@@ -11,10 +11,20 @@ export default async function handler(req, res) {
   }
 
   const backend = (process.env.BACKEND_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
+  // Parse the backend URL so we can log the hostname used (helps debug env issues).
+  let backendHost = null
+  try {
+    const parsed = new URL(backend)
+    backendHost = parsed.hostname
+  } catch (err) {
+    console.error('proxy-upload: invalid BACKEND_URL value', { backend })
+    return res.status(502).json({ error: 'Invalid BACKEND_URL. Check Vercel env var format (include protocol).' })
+  }
+
   // If running on Vercel, a localhost backend is unreachable — fail fast with guidance.
-  if (backend.startsWith('http://127.0.0.1') || backend.startsWith('http://localhost')) {
-    console.error('proxy-upload: BACKEND_URL appears to be localhost; set BACKEND_URL in Vercel project settings')
-    return res.status(502).json({ error: 'Backend unreachable from Vercel. Set BACKEND_URL environment variable to your backend URL.' })
+  if (backendHost === '127.0.0.1' || backendHost === 'localhost') {
+    console.error('proxy-upload: BACKEND_URL appears to be localhost; set BACKEND_URL in Vercel project settings', { backend, backendHost })
+    return res.status(502).json({ error: 'Backend unreachable from Vercel. Set BACKEND_URL environment variable to your backend URL.', backendHost })
   }
 
   try {
