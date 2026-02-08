@@ -443,6 +443,41 @@ export default function Dashboard() {
     setTtsLoadingText(null)
   }
 
+  const fileInputRef = useRef(null)
+
+  const uploadFile = async (file) => {
+    if (!file) return
+    const conv = getSelectedConversation()
+    const session_id = conv?.geminiSessionId || conv?.sessionId || null
+    const fd = new FormData()
+    fd.append('file', file, file.name)
+    if (session_id) fd.append('session_id', session_id)
+
+    try {
+      const res = await fetch('/api/proxy-upload', { method: 'POST', body: fd })
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '')
+        throw new Error(`Upload failed: ${res.status} ${txt}`)
+      }
+      let data = null
+      const ct = res.headers.get('content-type') || ''
+      if (ct.includes('application/json')) data = await res.json().catch(() => null)
+      else data = await res.text().catch(() => null)
+
+      // append a system message recording the upload and update session id if backend returned one
+      const msgText = `Uploaded file: ${file.name}` + (data && data?.message ? ` — ${data.message}` : '')
+      const newSession = data?.session_id || data?.session || data?.sessionId || null
+      setConversations((list) => list.map((c) => {
+        if (c.id !== selectedId) return c
+        const msgs = [...c.messages, { role: 'system', text: msgText }, { role: 'assistant', text: data?.ai_confirmation || data?.message || 'Notes added to memory.' }]
+        return { ...c, messages: msgs, sessionId: newSession || c.sessionId, geminiSessionId: newSession || c.geminiSessionId }
+      }))
+    } catch (e) {
+      console.error('File upload error', e)
+      alert('File upload failed: ' + (e.message || String(e)))
+    }
+  }
+
   const createConversation = (title) => {
     const conv = { id: `c-${Date.now()}`, title: title || `Conversation ${conversations.length + 1}`, messages: [], createdAt: Date.now(), geminiSessionId: null }
     setConversations((s) => [conv, ...s])
@@ -609,14 +644,23 @@ export default function Dashboard() {
             <footer className="mt-6">
               <div className="flex items-center gap-4">
                 <div className="flex-1">
-                  <RecorderUpload
-                    endpoint="/api/proxy-transcribe"
-                    onTranscribed={(txt) => {
-                      // Upload via same-origin proxy to avoid CORS and keep conversion
-                      handleTranscriptAndChat(txt)
-                    }}
-                    onRecordingStart={() => { try { stopAssistantAudio() } catch (e) { } }}
-                  />
+                  <div className="flex items-stretch gap-3">
+                    <div className="flex-[4]">
+                      <RecorderUpload
+                        hideStatus={true}
+                        endpoint="/api/proxy-transcribe"
+                        onTranscribed={(txt) => {
+                          // Upload via same-origin proxy to avoid CORS and keep conversion
+                          handleTranscriptAndChat(txt)
+                        }}
+                        onRecordingStart={() => { try { stopAssistantAudio() } catch (e) { } }}
+                      />
+                    </div>
+                    <div className="flex-[1]">
+                      <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFile(f); e.target.value = '' }} />
+                      <button onClick={() => fileInputRef.current?.click?.()} className="w-full h-full px-6 py-3 rounded-md bg-slate-700 text-lg font-medium">Upload File</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </footer>

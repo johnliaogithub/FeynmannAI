@@ -10,7 +10,7 @@ function extensionForMime(mime) {
   return 'webm'
 }
 
-export default function RecorderUpload({ endpoint = '/api/proxy-transcribe', onTranscribed, onRecordingStart }) {
+export default function RecorderUpload({ endpoint = '/api/proxy-transcribe', onTranscribed, onRecordingStart, compact = false, hideStatus = false }) {
   const [recording, setRecording] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [message, setMessage] = useState('')
@@ -295,15 +295,27 @@ export default function RecorderUpload({ endpoint = '/api/proxy-transcribe', onT
   }
 
   return (
-    <div>
-      <div className="flex items-start justify-between">
-        <div className="flex-1 flex flex-col items-start">
+    <div className="h-full">
+      <div className="flex items-center justify-between h-full">
+        <div className="flex-1 flex flex-col items-start h-full justify-center">
           {!recording ? (
-            <button onClick={start} className="w-full px-6 py-3 bg-primary rounded-md text-slate-900 text-lg font-semibold shadow">Click here or press enter to start recording</button>
-          ) : (
-            <button onClick={stop} className="w-full px-6 py-3 bg-rose-500 rounded-md text-white text-lg font-semibold shadow">Stop</button>
+            <button
+              onClick={start}
+              className={compact ? "px-5 py-3 bg-primary rounded-md text-slate-900 font-semibold text-lg min-w-[120px]" : "w-full h-full flex items-center justify-center px-6 py-3 bg-primary rounded-md text-slate-900 text-lg font-semibold shadow"}
+            >
+              {compact ? 'Record' : 'Click here or press enter to start recording'}
+            </button>
+            ) : (
+            <button
+              onClick={stop}
+              className={compact ? "px-5 py-3 bg-rose-500 rounded-md text-white font-semibold text-lg min-w-[120px]" : "w-full h-full flex items-center justify-center px-6 py-3 bg-rose-500 rounded-md text-white text-lg font-semibold shadow"}
+            >
+              {compact ? 'Stop' : 'Stop'}
+            </button>
           )}
-          <div className="mt-2 text-sm text-slate-400">{uploading ? 'Uploading…' : message}</div>
+          {!hideStatus && (
+            <div className="mt-2 text-sm text-slate-400">{uploading ? 'Uploading…' : message}</div>
+          )}
           {/* helper text removed — label shown on button */}
         </div>
         {/* Cancel button removed per request */}
