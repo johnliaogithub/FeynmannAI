@@ -4,6 +4,8 @@
 
 FeynmannAI is an interactive learning platform based on the **Feynman Technique**: the idea that you learn best when you explain a concept simply. Instead of explaining to a person, you teach a curious AI student who asks follow-up questions to test your understanding.
 
+Here is the devpost for the hackathon submission: [devpost url](https://devpost.com/software/feynmannai?ref_content=my-projects-tab&ref_feature=my_projects)
+
 ## Project Structure
 
 This repository is divided into two main parts:
