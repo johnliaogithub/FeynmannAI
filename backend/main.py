@@ -1,10 +1,11 @@
 import os
+import json
 import shutil
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Form
+from fastapi.responses import StreamingResponse, FileResponse
 import base64
 import mimetypes
-from langchain_core.messages import HumanMessage
-from fastapi.responses import FileResponse
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from fastapi.middleware.cors import CORSMiddleware
 from elevenlabs.client import ElevenLabs
 from backboard import BackboardClient
@@ -74,6 +75,38 @@ Student:
 # This creates the formatter
 prompt_formatter = PromptTemplate(template=template, input_variables=["text"])
 
+# System prompt extracted for the streaming endpoint (uses messages API, not PromptTemplate)
+FEYNMAN_SYSTEM_PROMPT = """You are a curious, high-performing professional in all fields and are here to help the user learn.
+The user is using the "Feynman Technique" to teach you a complex concept.
+
+**Your Core Mission:**
+Make the user understand the topic by forcing the user to simplify their overly complex language and bridge logical gaps.
+Never ask the user to explain correct ideas at or below a high school level. Never ask more than 2 questions on a topic.
+Never let a conversation dwell on one topic for more than 2 questions. Stop the conversation after a few questions.
+If the user explains a concept well, acknowledge understanding and stop asking questions.
+After one topic, ask if the user would like to review another topic.
+
+**The Golden Rules (Strict Compliance Required):**
+1. One question only. You must NEVER ask more than one question per response.
+2. If the user uses highly technical terms without explaining it, ask: "Wait, I'm a bit lost on [term]. What does that actually mean in simple terms?"
+3. Identify logic gaps. If the user explains the 'what' but skips the 'how', ask specifically about the missing link.
+4. Do not teach the user. Do not lecture. You are pretending to be the student.
+5. When the user gives a clear explanation, give positive feedback and stop asking questions.
+6. NEVER question anything at a high school understanding or lower.
+
+THE FACT-CHECK OVERRIDE (high priority)
+1. Constantly compare the user's explanation against your internal knowledge base.
+2. If the user provides a factually incorrect explanation, formula, or definition, stop and correct them.
+3. Deliver corrections by expressing confusion or citing a "conflict" in your understanding.
+4. Do not move to a new sub-topic until the factual error has been resolved.
+
+- Start with a high-school level of understanding.
+- Use a supportive, peer-to-peer tone.
+- Do not ask users to explain axioms, definitions, or simple math."""
+
+# In-memory conversation histories for the streaming endpoint (keyed by thread_id)
+stream_histories: dict[str, list] = {}
+
 app = FastAPI()
 
 app.add_middleware(
@@ -87,6 +120,44 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     text: str
     session_id: str | None = None
+
+@app.post("/stream-chat/")
+async def stream_chat(request: ChatRequest):
+    thread_id = request.session_id or str(uuid.uuid4())
+    history = stream_histories.get(thread_id, [])
+
+    # Rebuild message list from history
+    messages = [SystemMessage(content=FEYNMAN_SYSTEM_PROMPT)]
+    for msg in history:
+        cls = HumanMessage if msg["role"] == "human" else AIMessage
+        messages.append(cls(content=msg["content"]))
+    messages.append(HumanMessage(content=request.text))
+
+    collected: list[str] = []
+
+    async def generate():
+        try:
+            async for chunk in vision_llm.astream(messages):
+                token = chunk.content
+                if token:
+                    collected.append(token)
+                    yield f"data: {json.dumps({'token': token, 'session_id': thread_id})}\n\n"
+
+            full_response = "".join(collected)
+            stream_histories[thread_id] = history + [
+                {"role": "human", "content": request.text},
+                {"role": "ai", "content": full_response},
+            ]
+            yield f"data: {json.dumps({'done': True, 'session_id': thread_id})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
 
 @app.post("/chat/")
 async def chat(request: ChatRequest):
@@ -254,34 +325,33 @@ async def transcribe_audio(file: UploadFile = File(...)):
             os.remove(temp_filename)
 
 @app.post("/speak/")
-async def speak_text(request: SpeakRequest, background_tasks: BackgroundTasks ):
+async def speak_text(request: SpeakRequest):
     if not request.text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty.")
-    output_filename = f"tts_{uuid.uuid4()}.mp3"
     try:
-        # Call ElevenLabs TTS
-        audio_stream = client_eleven.text_to_speech.convert(
-            voice_id="vDchjyOZZytffNeZXfZK",  # or any voice you like
-            model_id="eleven_monolingual_v1",
+        audio_iterator = client_eleven.text_to_speech.convert(
+            voice_id="21m00Tcm4TlvDq8ikWAM",  # Rachel — free built-in voice
+            model_id="eleven_turbo_v2_5",
             text=request.text
         )
-        # Save audio file
-        with open(output_filename, "wb") as f:
-            for chunk in audio_stream:
-                f.write(chunk)
-       
-        # Schedule cleanup AFTER response is sent
-        background_tasks.add_task(os.remove, output_filename)
-
-        # Return audio file
-        return FileResponse(
-            output_filename,
-            media_type="audio/mpeg",
-            filename="response.mp3"
-        )
+        # Eagerly fetch the first chunk so ElevenLabs auth/payment errors surface
+        # before we commit to a 200 OK streaming response.
+        first_chunk = next(iter(audio_iterator), None)
+        if first_chunk is None:
+            raise HTTPException(status_code=500, detail="ElevenLabs returned empty audio")
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Server Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+    async def generate():
+        yield first_chunk
+        for chunk in audio_iterator:
+            if chunk:
+                yield chunk
+
+    return StreamingResponse(generate(), media_type="audio/mpeg")
 
 @app.post("/upload-notes/")
 async def upload_notes(

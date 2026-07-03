@@ -146,102 +146,148 @@ export default function Dashboard() {
     return inlineReplaced
   }
 
-  // send transcript to backend chat endpoint and append Gemini reply
+  // Extract complete sentences from a text buffer, returning sentences found + remainder
+  const extractSentences = (buffer) => {
+    const sentences = []
+    let remaining = buffer
+    const pattern = /^(.*?[.!?])(?=\s|$)/
+    let match
+    while ((match = remaining.match(pattern)) !== null) {
+      const s = match[1].trim()
+      if (s.length > 8) sentences.push(s)  // skip very short fragments
+      remaining = remaining.slice(match[0].length).trimStart()
+    }
+    return { sentences, remaining }
+  }
+
+  // Fetch TTS audio for a sentence, returning an object URL (or null on error)
+  const fetchTTSAudio = async (sentence) => {
+    try {
+      const r = await fetch('/api/proxy-speak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
+        body: JSON.stringify({ text: sentence }),
+      })
+      if (!r.ok) return null
+      const buf = await r.arrayBuffer()
+      return URL.createObjectURL(new Blob([buf], { type: 'audio/mpeg' }))
+    } catch { return null }
+  }
+
+  // Play an object URL and resolve when playback ends
+  const playAudioURL = (url) => new Promise((resolve) => {
+    const a = new Audio(url)
+    audioRef.current = a
+    a.onended = () => { try { URL.revokeObjectURL(url) } catch { } resolve() }
+    a.onerror = resolve
+    a.play().catch(resolve)
+  })
+
+  // send transcript to backend streaming chat endpoint, display tokens live, queue TTS per sentence
   const handleTranscriptAndChat = async (text) => {
     if (!text) return
     const userEntry = { role: 'user', text }
-    const pendingAssistant = { role: 'assistant', text: 'Thinking...', _pending: true }
-    // if a local placeholder exists as the last user message, replace it
-    setConversations((list) => {
-      return list.map((c) => {
-        if (c.id !== selectedId) return c
-        const last = c.messages[c.messages.length - 1]
-        let msgs = c.messages
-        if (last && last.role === 'user' && last._local) {
-          msgs = [...c.messages.slice(0, -1), userEntry, pendingAssistant]
-        } else {
-          msgs = [...c.messages, userEntry, pendingAssistant]
-        }
-        return { ...c, messages: msgs }
-      })
-    })
+    const pendingAssistant = { role: 'assistant', text: '', _pending: true }
+
+    setConversations((list) => list.map((c) => {
+      if (c.id !== selectedId) return c
+      const last = c.messages[c.messages.length - 1]
+      const base = last?.role === 'user' && last._local ? c.messages.slice(0, -1) : c.messages
+      return { ...c, messages: [...base, userEntry, pendingAssistant] }
+    }))
+
+    const conv = getSelectedConversation()
+    const sessionId = conv?.geminiSessionId || null
+
+    // TTS queue: each entry is a Promise<string|null> (resolves to an object URL)
+    // We fire TTS requests eagerly (parallel) but play them strictly in order.
+    const ttsQueue = []
+    let draining = false
+
+    const drainQueue = async () => {
+      if (draining) return
+      draining = true
+      while (ttsQueue.length > 0) {
+        const urlPromise = ttsQueue.shift()
+        const url = await urlPromise
+        if (url) await playAudioURL(url)
+      }
+      draining = false
+    }
+
+    const enqueueSentence = (sentence) => {
+      ttsQueue.push(fetchTTSAudio(sentence))  // fire immediately, queue the promise
+      drainQueue()                             // drain plays in FIFO order
+    }
 
     try {
-      const conv = getSelectedConversation()
-      const payload = { text }
-      if (conv?.geminiSessionId) payload.session_id = conv.geminiSessionId
-      // console.log('proxy /api/proxy-chat sending payload', payload)
-      const controller = new AbortController()
-      const timeoutMs = 25000
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
-      let res
-      try {
-        // include whiteboard image if present on the selected conversation or transient ref
-        let imageBase64 = conv?.whiteboardImageBase64 || null
-        let imageContentType = conv?.whiteboardImageContentType || null
-        if (!imageBase64 && whiteboardImageRef.current?.id === selectedId) {
-          imageBase64 = whiteboardImageRef.current.raw
-          imageContentType = whiteboardImageRef.current.contentType
-        }
+      const res = await fetch('/api/proxy-stream-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, session_id: sessionId }),
+      })
 
-        const endpoint = imageBase64 ? '/api/proxy-chat-image' : '/api/proxy-chat'
-        if (imageBase64) {
-          payload.image_base64 = imageBase64
-          payload.image_content_type = imageContentType || 'image/png'
-        }
+      if (!res.ok) throw new Error(`Server ${res.status}`)
 
-        res = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
-        })
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
 
-        // If the image proxy isn't available on the host (404), fall back
-        // to the text-only chat proxy on the same origin so the user still
-        // receives a response without exposing local network addresses.
-        if (res.status === 404 && endpoint === '/api/proxy-chat-image') {
-          try {
-            const fbRes = await fetch('/api/proxy-chat', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text, session_id: payload.session_id }),
-              signal: controller.signal,
-            })
-            if (fbRes.ok) res = fbRes
-            else console.warn('Same-origin chat fallback failed', fbRes.status)
-          } catch (fbErr) {
-            console.warn('Same-origin chat fallback error', fbErr)
+      let fullText = ''
+      let sentenceBuffer = ''
+      let newSessionId = sessionId
+      let leftover = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const raw = leftover + decoder.decode(value, { stream: true })
+        const lines = raw.split('\n')
+        leftover = lines.pop()  // last item may be an incomplete line
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          let data
+          try { data = JSON.parse(line.slice(6)) } catch { continue }
+
+          if (data.error) throw new Error(data.error)
+
+          if (data.token) {
+            fullText += data.token
+            sentenceBuffer += data.token
+
+            // Update the pending message in real-time as tokens arrive
+            setConversations((list) => list.map((c) => {
+              if (c.id !== selectedId) return c
+              return { ...c, messages: c.messages.map((m) => m._pending ? { role: 'assistant', text: fullText } : m) }
+            }))
+
+            // Extract complete sentences and enqueue TTS for each
+            const { sentences, remaining } = extractSentences(sentenceBuffer)
+            sentences.forEach(enqueueSentence)
+            sentenceBuffer = remaining
+          }
+
+          if (data.done) {
+            newSessionId = data.session_id
+            // Flush any trailing text that didn't end with punctuation
+            if (sentenceBuffer.trim().length > 0) enqueueSentence(sentenceBuffer.trim())
+            sentenceBuffer = ''
           }
         }
-      } finally {
-        clearTimeout(timeoutId)
       }
-      if (!res.ok) {
-        const txt = await res.text().catch(() => '')
-        throw new Error(`Server ${res.status}: ${txt}`)
-      }
-      const data = await res.json().catch(() => ({}))
-      console.log('proxy /api/proxy-chat response:', data)
-      const reply = data?.response || data?.transcription || data?.text || ''
-      const final = reply && reply.trim() ? reply : '[no reply]'
 
-      // replace the pending assistant message with final reply and save gemini session id if provided
-      const sessionId = data?.session_id || data?.session || data?.gemini_session_id || data?.sessionId || null
       setConversations((list) => list.map((c) => {
         if (c.id !== selectedId) return c
-        const msgs = c.messages.map((m) => m._pending ? ({ role: 'assistant', text: final }) : m)
-        return { ...c, messages: msgs, geminiSessionId: sessionId || c.geminiSessionId }
+        const msgs = c.messages.map((m) => m._pending ? { role: 'assistant', text: fullText || '[no reply]' } : m)
+        return { ...c, messages: msgs, geminiSessionId: newSessionId || c.geminiSessionId }
       }))
 
-      // Auto-play assistant reply TTS
-      try { playAssistantAudio(final) } catch (e) { console.warn('Auto-play failed', e) }
     } catch (e) {
-      console.error('Chat error', e)
-      const errText = `Error: ${e.message || 'chat failed'}`
+      console.error('Stream chat error', e)
       setConversations((list) => list.map((c) => {
         if (c.id !== selectedId) return c
-        const msgs = c.messages.map((m) => m._pending ? ({ role: 'assistant', text: errText }) : m)
+        const msgs = c.messages.map((m) => m._pending ? { role: 'assistant', text: `Error: ${e.message || 'chat failed'}` } : m)
         return { ...c, messages: msgs }
       }))
     }
@@ -360,9 +406,9 @@ export default function Dashboard() {
       // If the response is a streaming audio body and the browser supports MediaSource,
       // stream chunks into a MediaSource for earlier playback start.
       try {
-        const isMSESupported = typeof window !== 'undefined' && 'MediaSource' in window
+        const mime = ct || 'audio/mpeg'
+        const isMSESupported = typeof window !== 'undefined' && 'MediaSource' in window && MediaSource.isTypeSupported(mime)
         if (isMSESupported && res.body) {
-          const mime = ct || 'audio/mpeg'
           const mediaSource = new MediaSource()
           const url = URL.createObjectURL(mediaSource)
           setPlayingUrl(url)
