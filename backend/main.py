@@ -33,9 +33,6 @@ client_backboard = BackboardClient(api_key=backboard_api_key)
 # Initialize Gemini for Vision
 vision_llm = ChatGoogleGenerativeAI(model="gemini-flash-latest", google_api_key=google_api_key)
 
-class ChatRequest(BaseModel):
-    text: str
-
 class SpeakRequest(BaseModel):
     text: str
 
